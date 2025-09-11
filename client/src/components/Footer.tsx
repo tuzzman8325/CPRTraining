@@ -29,12 +29,12 @@ export default function Footer() {
               />
               <div>
                 <h3 className="text-lg font-bold">LifeSaver CPR Training</h3>
-                <p className="text-sm text-muted-foreground">AHA Certified Training Center</p>
+                <p className="text-sm text-muted-foreground">AHA Certified Instructor</p>
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
               Professional CPR and life support training serving our community with 
-              American Heart Association certified courses.
+              American Heart Association certified instruction.
             </p>
             <div className="flex items-center space-x-2 text-sm">
               <Heart className="h-4 w-4 text-primary" />
@@ -154,7 +154,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
           <div className="text-sm text-muted-foreground">
             <p>&copy; 2024 LifeSaver CPR Training. All rights reserved.</p>
-            <p>Licensed AHA Training Center | Certified Instructor</p>
+            <p>AHA Certified Instructor | Professional Training Standards</p>
           </div>
           
           <div className="text-sm text-muted-foreground text-center md:text-right">
