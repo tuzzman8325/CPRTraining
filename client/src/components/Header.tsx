@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen } from 'lucide-react';
-import ahaBadge from '@assets/generated_images/AHA_certification_badge_22dd9294.png';
+import ekgLogo from '@assets/generated_images/EKG_line_logo_7cbd6728.png';
 
 export default function Header() {
   const [location] = useLocation();
@@ -25,8 +25,8 @@ export default function Header() {
           {/* Logo and Business Name */}
           <Link href="/" className="flex items-center space-x-3 hover-elevate rounded-lg px-2 py-1" data-testid="link-home">
             <img 
-              src={ahaBadge} 
-              alt="AHA Certified" 
+              src={ekgLogo} 
+              alt="LifeSaver CPR Training" 
               className="h-10 w-10"
             />
             <div className="flex flex-col">
