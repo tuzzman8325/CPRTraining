@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen } from 'lucide-react';
-import ekgLine from '@assets/generated_images/Horizontal_EKG_line_separator_8adeba28.png';
+import ekgLogo from '@assets/generated_images/EKG_line_logo_7cbd6728.png';
 
 export default function Header() {
   const [location] = useLocation();
@@ -21,16 +21,18 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
-        <div className="flex h-20 items-center justify-between">
+        <div className="flex h-16 items-center justify-between">
           {/* Logo and Business Name */}
-          <Link href="/" className="flex flex-col items-start hover-elevate rounded-lg px-3 py-2" data-testid="link-home">
-            <h1 className="text-xl font-bold text-foreground mb-1">LifeSaver CPR Training</h1>
+          <Link href="/" className="flex items-center space-x-3 hover-elevate rounded-lg px-2 py-1" data-testid="link-home">
             <img 
-              src={ekgLine} 
-              alt="EKG Line" 
-              className="h-3 w-48 object-cover mb-1"
+              src={ekgLogo} 
+              alt="LifeSaver CPR Training" 
+              className="h-10 w-10"
             />
-            <p className="text-sm text-muted-foreground">AHA Certified Instructor</p>
+            <div className="flex flex-col">
+              <h1 className="text-lg font-bold text-foreground">LifeSaver CPR Training</h1>
+              <p className="text-xs text-muted-foreground">AHA Certified Instructor</p>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}
