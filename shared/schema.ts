@@ -74,8 +74,9 @@ export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({
   id: true,
   createdAt: true,
   usedCount: true,
+  createdBy: true, // Let backend assign this
 }).extend({
-  expiresAt: z.string().datetime(),
+  expiresAt: z.string().min(1, "Expiration date is required"), // Accept any date string
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

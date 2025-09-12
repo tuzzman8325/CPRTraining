@@ -295,7 +295,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/discount-codes", async (req, res) => {
     try {
       const discountCodeData = insertDiscountCodeSchema.parse(req.body);
-      const discountCode = await storage.createDiscountCode(discountCodeData);
+      
+      // Convert date string to full ISO datetime
+      const expiresAtDate = discountCodeData.expiresAt.includes('T') 
+        ? discountCodeData.expiresAt 
+        : `${discountCodeData.expiresAt}T23:59:59.999Z`;
+      
+      // Ensure admin user exists, then assign createdBy
+      let adminUser = await storage.getUserByUsername('admin');
+      if (!adminUser) {
+        adminUser = await storage.createUser({
+          username: 'admin',
+          email: 'admin@system.local',
+          password: 'admin_system_user'
+        });
+      }
+      
+      const discountCodeWithCreator = {
+        ...discountCodeData,
+        expiresAt: expiresAtDate,
+        createdBy: adminUser.id
+      };
+      
+      const discountCode = await storage.createDiscountCode(discountCodeWithCreator);
       
       res.status(201).json({ 
         success: true, 

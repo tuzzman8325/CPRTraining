@@ -340,8 +340,7 @@ export default function AdminDashboard() {
       expiresAt: '',
       isActive: true,
       maxUses: null,
-      description: '',
-      createdBy: 'admin'
+      description: ''
     }
   });
 

@@ -30,7 +30,7 @@ export interface IStorage {
   // Discount Code CRUD operations
   getDiscountCodes(): Promise<DiscountCode[]>;
   getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined>;
-  createDiscountCode(discountCode: InsertDiscountCode): Promise<DiscountCode>;
+  createDiscountCode(discountCode: InsertDiscountCode & { createdBy: string }): Promise<DiscountCode>;
   updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined>;
   deleteDiscountCode(id: string): Promise<boolean>;
   validateDiscountCode(code: string): Promise<{ valid: boolean; discountCode?: DiscountCode; reason?: string }>;
@@ -185,7 +185,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.discountCodes.values()).find(dc => dc.code === code);
   }
 
-  async createDiscountCode(insertDiscountCode: InsertDiscountCode): Promise<DiscountCode> {
+  async createDiscountCode(insertDiscountCode: InsertDiscountCode & { createdBy: string }): Promise<DiscountCode> {
     const id = randomUUID();
     const code = insertDiscountCode.code || this.generateDiscountCode();
     const discountCode: DiscountCode = {
@@ -196,6 +196,7 @@ export class MemStorage implements IStorage {
       isActive: insertDiscountCode.isActive ?? true,
       usedCount: 0,
       maxUses: insertDiscountCode.maxUses || null,
+      createdBy: insertDiscountCode.createdBy,
       createdAt: new Date(),
       description: insertDiscountCode.description || null
     };
@@ -207,7 +208,12 @@ export class MemStorage implements IStorage {
     const existing = this.discountCodes.get(id);
     if (!existing) return undefined;
     
-    const updated: DiscountCode = { ...existing, ...updates };
+    const processedUpdates = { ...updates };
+    if (processedUpdates.expiresAt) {
+      processedUpdates.expiresAt = new Date(processedUpdates.expiresAt) as any;
+    }
+    
+    const updated: DiscountCode = { ...existing, ...processedUpdates };
     this.discountCodes.set(id, updated);
     return updated;
   }
@@ -347,7 +353,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createDiscountCode(insertDiscountCode: InsertDiscountCode): Promise<DiscountCode> {
+  async createDiscountCode(insertDiscountCode: InsertDiscountCode & { createdBy: string }): Promise<DiscountCode> {
     const codeValue = insertDiscountCode.code || this.generateDiscountCode();
     const result = await db.insert(discountCodes).values({
       ...insertDiscountCode,
