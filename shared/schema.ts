@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, date, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, integer, pgEnum, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -37,6 +37,19 @@ export const registrations = pgTable("registrations", {
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
   phone: text("phone"),
+  discountCodeId: varchar("discount_code_id").references(() => discountCodes.id), // Reference to discount code used
+});
+
+export const discountCodes = pgTable("discount_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 9 }).notNull().unique(), // Format: ABCD-EFGH
+  expiresAt: timestamp("expires_at").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  usedCount: integer("used_count").notNull().default(0),
+  maxUses: integer("max_uses"), // null means unlimited uses
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`NOW()`),
+  description: text("description"), // Optional description for the code
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -54,6 +67,15 @@ export const insertRegistrationSchema = createInsertSchema(registrations).omit({
   registrationDate: true,
 }).partial({
   userId: true,
+  discountCodeId: true,
+});
+
+export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({
+  id: true,
+  createdAt: true,
+  usedCount: true,
+}).extend({
+  expiresAt: z.string().datetime(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -64,3 +86,6 @@ export type Class = typeof classes.$inferSelect;
 
 export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrations.$inferSelect;
+
+export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
+export type DiscountCode = typeof discountCodes.$inferSelect;
