@@ -73,7 +73,6 @@ export default function Header() {
                   <Button variant="ghost" size="sm" className="flex items-center space-x-2" data-testid="button-user-menu">
                     <User className="h-4 w-4" />
                     <span>{user?.username}</span>
-                    {isAdmin && <Badge variant="destructive" className="text-xs">Admin</Badge>}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -142,9 +141,8 @@ export default function Header() {
                 {isAuthenticated && (
                   <div className="px-3 py-2 bg-muted rounded-lg">
                     <div className="font-medium">{user?.username}</div>
-                    <div className="text-sm text-muted-foreground flex items-center space-x-2">
+                    <div className="text-sm text-muted-foreground">
                       <span>{isAdmin ? 'Administrator' : 'Client'}</span>
-                      {isAdmin && <Badge variant="destructive" className="text-xs">Admin</Badge>}
                     </div>
                   </div>
                 )}
