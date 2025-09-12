@@ -47,7 +47,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Class, InsertClass, insertClassSchema } from '@shared/schema';
+import { Class, InsertClass, insertClassSchema, Registration } from '@shared/schema';
 import { z } from 'zod';
 
 // API Response types
@@ -61,6 +61,11 @@ interface ClassResponse {
   class: Class;
   message: string;
 }
+
+interface RegistrationsResponse {
+  success: boolean;
+  registrations: Registration[];
+}
 import { 
   Search, 
   Plus, 
@@ -71,7 +76,8 @@ import {
   Calendar,
   Award,
   DollarSign,
-  BookOpen
+  BookOpen,
+  ClipboardList
 } from 'lucide-react';
 
 interface Client {
@@ -137,10 +143,18 @@ export default function AdminDashboard() {
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [isAddClassDialogOpen, setIsAddClassDialogOpen] = useState(false);
   const [isEditClassDialogOpen, setIsEditClassDialogOpen] = useState(false);
+
+  // Registration state
+  const [registrationSearchTerm, setRegistrationSearchTerm] = useState('');
   
   // React Query hooks for classes
   const { data: classesData, isLoading: classesLoading } = useQuery<ClassesResponse>({
     queryKey: ['/api/classes'],
+  });
+
+  // React Query hooks for registrations
+  const { data: registrationsData, isLoading: registrationsLoading } = useQuery<RegistrationsResponse>({
+    queryKey: ['/api/registrations'],
   });
   
   const classes: Class[] = classesData?.classes || [];
@@ -184,6 +198,19 @@ export default function AdminDashboard() {
     },
     onError: (error) => {
       toast({ title: "Error", description: `Failed to delete class: ${error.message}`, variant: "destructive" });
+    }
+  });
+  
+  const deleteRegistrationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/registrations/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/registrations'] });
+      toast({ title: "Success", description: "Registration deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to delete registration: ${error.message}`, variant: "destructive" });
     }
   });
   
@@ -246,6 +273,13 @@ export default function AdminDashboard() {
     classItem.type.toLowerCase().includes(classSearchTerm.toLowerCase())
   );
 
+  const registrations = registrationsData?.registrations || [];
+  const filteredRegistrations = registrations.filter(registration =>
+    registration.firstName.toLowerCase().includes(registrationSearchTerm.toLowerCase()) ||
+    registration.lastName.toLowerCase().includes(registrationSearchTerm.toLowerCase()) ||
+    registration.email.toLowerCase().includes(registrationSearchTerm.toLowerCase())
+  );
+
   // Client handlers
   const handleEdit = (client: Client) => {
     setSelectedClient(client);
@@ -306,6 +340,13 @@ export default function AdminDashboard() {
       updateClassMutation.mutate({ id: selectedClass.id, data });
     }
   };
+  
+  // Registration handlers
+  const handleDeleteRegistration = (registrationId: string) => {
+    if (window.confirm('Are you sure you want to delete this registration?')) {
+      deleteRegistrationMutation.mutate(registrationId);
+    }
+  };
 
   const stats = {
     totalClients: clients.length,
@@ -313,6 +354,8 @@ export default function AdminDashboard() {
     totalCertifications: clients.reduce((sum, client) => sum + client.completedCourses.length, 0),
     totalClasses: classes.length,
     availableSpots: classes.reduce((sum, classItem) => sum + classItem.available, 0),
+    totalRegistrations: registrations.length,
+    pendingRegistrations: registrations.filter(r => r.status === 'pending').length,
     monthlyRevenue: 2450 // TODO: Calculate from actual data
   };
 
@@ -338,7 +381,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-8 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
@@ -386,6 +429,26 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalCertifications}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalRegistrations}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending Registrations</CardTitle>
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.pendingRegistrations}</div>
             </CardContent>
           </Card>
           
@@ -574,6 +637,118 @@ export default function AdminDashboard() {
                           </TableCell>
                         </TableRow>
                       ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Registration Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Registration Management</CardTitle>
+            <CardDescription>View and manage all class registrations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Search */}
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search registrations by name or email..."
+                value={registrationSearchTerm}
+                onChange={(e) => setRegistrationSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-registrations"
+              />
+            </div>
+
+            {/* Registrations Table */}
+            {registrationsLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="text-muted-foreground">Loading registrations...</div>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Amount Paid</TableHead>
+                      <TableHead>Registration Date</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRegistrations.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          No registrations found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredRegistrations.map((registration) => {
+                        const relatedClass = classes.find(c => c.id === registration.classId);
+                        return (
+                          <TableRow key={registration.id} data-testid={`row-registration-${registration.id}`}>
+                            <TableCell className="font-medium">
+                              {registration.firstName} {registration.lastName}
+                            </TableCell>
+                            <TableCell>{registration.email}</TableCell>
+                            <TableCell>{registration.phone || 'N/A'}</TableCell>
+                            <TableCell>
+                              {relatedClass ? (
+                                <div>
+                                  <div className="font-medium">{relatedClass.title}</div>
+                                  <Badge variant="outline" className="text-xs">
+                                    {relatedClass.type}
+                                  </Badge>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">Class not found</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={
+                                  registration.status === 'confirmed' ? 'default' :
+                                  registration.status === 'pending' ? 'secondary' :
+                                  'destructive'
+                                }
+                              >
+                                {registration.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {registration.amountPaid ? `$${(registration.amountPaid / 100).toFixed(2)}` : 'N/A'}
+                            </TableCell>
+                            <TableCell>{registration.registrationDate}</TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" data-testid={`button-actions-${registration.id}`}>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteRegistration(registration.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
