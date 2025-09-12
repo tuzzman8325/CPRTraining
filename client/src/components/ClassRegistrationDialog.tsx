@@ -133,64 +133,66 @@ const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess,
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full">
+      <div className="flex-1 space-y-6 pr-1">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="firstName">First Name *</Label>
+            <Input
+              id="firstName"
+              {...register('firstName')}
+              data-testid="input-first-name"
+              className={errors.firstName ? 'border-destructive' : ''}
+            />
+            {errors.firstName && (
+              <p className="text-sm text-destructive mt-1">{errors.firstName.message}</p>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="lastName">Last Name *</Label>
+            <Input
+              id="lastName"
+              {...register('lastName')}
+              data-testid="input-last-name"
+              className={errors.lastName ? 'border-destructive' : ''}
+            />
+            {errors.lastName && (
+              <p className="text-sm text-destructive mt-1">{errors.lastName.message}</p>
+            )}
+          </div>
+        </div>
+
         <div>
-          <Label htmlFor="firstName">First Name *</Label>
+          <Label htmlFor="email">Email Address *</Label>
           <Input
-            id="firstName"
-            {...register('firstName')}
-            data-testid="input-first-name"
-            className={errors.firstName ? 'border-destructive' : ''}
+            id="email"
+            type="email"
+            {...register('email')}
+            data-testid="input-email"
+            className={errors.email ? 'border-destructive' : ''}
           />
-          {errors.firstName && (
-            <p className="text-sm text-destructive mt-1">{errors.firstName.message}</p>
+          {errors.email && (
+            <p className="text-sm text-destructive mt-1">{errors.email.message}</p>
           )}
         </div>
+
         <div>
-          <Label htmlFor="lastName">Last Name *</Label>
+          <Label htmlFor="phone">Phone Number (Optional)</Label>
           <Input
-            id="lastName"
-            {...register('lastName')}
-            data-testid="input-last-name"
-            className={errors.lastName ? 'border-destructive' : ''}
+            id="phone"
+            type="tel"
+            {...register('phone')}
+            data-testid="input-phone"
           />
-          {errors.lastName && (
-            <p className="text-sm text-destructive mt-1">{errors.lastName.message}</p>
-          )}
+        </div>
+
+        <div className="border rounded-lg p-4 bg-muted/50">
+          <Label className="text-sm font-medium mb-2 block">Payment Information</Label>
+          <PaymentElement />
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="email">Email Address *</Label>
-        <Input
-          id="email"
-          type="email"
-          {...register('email')}
-          data-testid="input-email"
-          className={errors.email ? 'border-destructive' : ''}
-        />
-        {errors.email && (
-          <p className="text-sm text-destructive mt-1">{errors.email.message}</p>
-        )}
-      </div>
-
-      <div>
-        <Label htmlFor="phone">Phone Number (Optional)</Label>
-        <Input
-          id="phone"
-          type="tel"
-          {...register('phone')}
-          data-testid="input-phone"
-        />
-      </div>
-
-      <div className="border rounded-lg p-4 bg-muted/50">
-        <Label className="text-sm font-medium mb-2 block">Payment Information</Label>
-        <PaymentElement />
-      </div>
-
-      <div className="flex justify-between pt-4">
+      <div className="flex justify-between pt-6 mt-6 border-t bg-background flex-shrink-0">
         <Button
           type="button"
           variant="outline"
@@ -287,8 +289,8 @@ export default function ClassRegistrationDialog({ isOpen, onClose, classData }: 
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-xl">Register for {classData.title}</DialogTitle>
           <div className="text-sm text-muted-foreground mt-2">
             <p><strong>Date:</strong> {new Date(classData.date).toLocaleDateString()}</p>
@@ -299,27 +301,29 @@ export default function ClassRegistrationDialog({ isOpen, onClose, classData }: 
           </div>
         </DialogHeader>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin" />
-            <span className="ml-2">Initializing payment...</span>
-          </div>
-        ) : clientSecret ? (
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
-            <RegistrationForm
-              classData={classData}
-              clientSecret={clientSecret}
-              paymentIntentId={paymentIntentId}
-              onSuccess={handleSuccess}
-              onCancel={handleClose}
-            />
-          </Elements>
-        ) : (
-          <div className="text-center py-8">
-            <p>Unable to initialize payment. Please try again.</p>
-            <Button onClick={handleClose} className="mt-4">Close</Button>
-          </div>
-        )}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Initializing payment...</span>
+            </div>
+          ) : clientSecret ? (
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <RegistrationForm
+                classData={classData}
+                clientSecret={clientSecret}
+                paymentIntentId={paymentIntentId}
+                onSuccess={handleSuccess}
+                onCancel={handleClose}
+              />
+            </Elements>
+          ) : (
+            <div className="text-center py-8">
+              <p>Unable to initialize payment. Please try again.</p>
+              <Button onClick={handleClose} className="mt-4">Close</Button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
