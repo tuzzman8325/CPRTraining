@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { TimeInput } from '@/components/ui/time-input';
 import { 
   Table, 
   TableBody, 
@@ -722,7 +723,12 @@ export default function AdminDashboard() {
                       <FormItem>
                         <FormLabel>Time</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="9:00 AM" data-testid="input-add-time" />
+                          <TimeInput 
+                            value={field.value} 
+                            onChange={field.onChange} 
+                            placeholder="9:00 AM" 
+                            data-testid="input-add-time" 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -884,7 +890,11 @@ export default function AdminDashboard() {
                         <FormItem>
                           <FormLabel>Time</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-edit-time" />
+                            <TimeInput 
+                              value={field.value} 
+                              onChange={field.onChange} 
+                              data-testid="input-edit-time" 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
