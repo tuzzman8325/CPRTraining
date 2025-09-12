@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema } from "@shared/schema";
+import { insertUserSchema, insertClassSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -57,6 +57,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Registration error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Class management routes
+  app.get("/api/classes", async (req, res) => {
+    try {
+      const classes = await storage.getClasses();
+      res.json({ success: true, classes });
+    } catch (error) {
+      console.error("Get classes error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/classes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const classData = await storage.getClassById(id);
+      
+      if (!classData) {
+        return res.status(404).json({ error: "Class not found" });
+      }
+
+      res.json({ success: true, class: classData });
+    } catch (error) {
+      console.error("Get class error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/classes", async (req, res) => {
+    try {
+      const classData = insertClassSchema.parse(req.body);
+      const newClass = await storage.createClass(classData);
+      
+      res.status(201).json({ 
+        success: true, 
+        class: newClass,
+        message: "Class created successfully"
+      });
+    } catch (error) {
+      console.error("Create class error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid class data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/classes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertClassSchema.partial().parse(req.body);
+      
+      const updatedClass = await storage.updateClass(id, updates);
+      
+      if (!updatedClass) {
+        return res.status(404).json({ error: "Class not found" });
+      }
+
+      res.json({ 
+        success: true, 
+        class: updatedClass,
+        message: "Class updated successfully"
+      });
+    } catch (error) {
+      console.error("Update class error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid class data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/classes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteClass(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Class not found" });
+      }
+
+      res.json({ 
+        success: true,
+        message: "Class deleted successfully"
+      });
+    } catch (error) {
+      console.error("Delete class error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
