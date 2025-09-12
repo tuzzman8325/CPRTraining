@@ -4,10 +4,17 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { insertUserSchema, insertClassSchema, insertRegistrationSchema } from "@shared/schema";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+// Use testing keys in development, live keys in production
+const stripeSecretKey = process.env.NODE_ENV === 'development' 
+  ? process.env.TESTING_STRIPE_SECRET_KEY 
+  : process.env.STRIPE_SECRET_KEY;
+
+if (!stripeSecretKey) {
+  throw new Error(`Missing required Stripe secret: ${process.env.NODE_ENV === 'development' ? 'TESTING_STRIPE_SECRET_KEY' : 'STRIPE_SECRET_KEY'}`);
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+
+console.log(`Using Stripe in ${process.env.NODE_ENV} mode`);
+const stripe = new Stripe(stripeSecretKey, {
   apiVersion: "2025-08-27.basil",
 });
 
