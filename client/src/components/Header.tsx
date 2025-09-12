@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen } from 'lucide-react';
-import ekgLogo from '@assets/generated_images/EKG_line_logo_7cbd6728.png';
+import ekgLogo from '@assets/generated_images/EKG_line_logo_7cbd6728.png?url';
 
 export default function Header() {
   const [location] = useLocation();
