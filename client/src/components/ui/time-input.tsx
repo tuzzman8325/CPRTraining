@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -12,6 +12,7 @@ interface TimeInputProps {
 export function TimeInput({ value = '', onChange, placeholder = '9:00 AM', 'data-testid': testId }: TimeInputProps) {
   const [timeValue, setTimeValue] = useState('');
   const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Parse the initial value when component mounts or value changes
   useEffect(() => {
@@ -40,7 +41,9 @@ export function TimeInput({ value = '', onChange, placeholder = '9:00 AM', 'data
 
   // Format time input as user types
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
+    const input = e.target;
+    const rawValue = input.value;
+    const cursorPosition = input.selectionStart || 0;
     
     // Allow completely empty field
     if (rawValue === '') {
@@ -61,34 +64,25 @@ export function TimeInput({ value = '', onChange, placeholder = '9:00 AM', 'data
     
     // Limit to 4 digits max
     const limitedDigits = digits.substring(0, 4);
+    const previousValue = timeValue;
     
-    // Format based on number of digits
+    // Format based on number of digits  
     let formatted = '';
     
     if (limitedDigits.length === 1) {
-      // Just one digit: "9"
       formatted = limitedDigits;
     } else if (limitedDigits.length === 2) {
-      const num = parseInt(limitedDigits);
-      if (num <= 12) {
-        // Valid hour: "09" or "12"
-        formatted = limitedDigits;
-      } else {
-        // Split into H:M: "13" becomes "1:3"
-        formatted = `${limitedDigits[0]}:${limitedDigits[1]}`;
-      }
+      // For 2 digits, just display them as-is (don't auto-add colon yet)
+      // Let the user type the third digit before deciding on formatting
+      formatted = limitedDigits;
     } else if (limitedDigits.length === 3) {
-      // For 3 digits, always treat as H:MM (more natural)
-      // "115" becomes "1:15", "930" becomes "9:30", "123" becomes "1:23"
       formatted = `${limitedDigits[0]}:${limitedDigits.substring(1)}`;
     } else if (limitedDigits.length === 4) {
       const firstTwo = parseInt(limitedDigits.substring(0, 2));
       if (firstTwo <= 12) {
-        // "1234" becomes "12:34"
         const minutes = Math.min(59, parseInt(limitedDigits.substring(2)));
         formatted = `${limitedDigits.substring(0, 2)}:${minutes.toString().padStart(2, '0')}`;
       } else {
-        // "2345" becomes "2:34" (ignore last digit)
         const minutes = Math.min(59, parseInt(limitedDigits.substring(1, 3)));
         formatted = `${limitedDigits[0]}:${minutes.toString().padStart(2, '0')}`;
       }
@@ -96,8 +90,27 @@ export function TimeInput({ value = '', onChange, placeholder = '9:00 AM', 'data
     
     setTimeValue(formatted);
     
-    // Only call onChange if we have a valid formatted time
-    if (formatted) {
+    // Calculate new cursor position
+    const lengthDiff = formatted.length - previousValue.length;
+    let newCursorPosition = cursorPosition;
+    
+    // If a colon was added and cursor is after it, adjust position
+    if (lengthDiff > 0 && formatted.includes(':') && !previousValue.includes(':')) {
+      const colonIndex = formatted.indexOf(':');
+      if (cursorPosition > colonIndex) {
+        newCursorPosition = cursorPosition + 1;
+      }
+    }
+    
+    // Restore cursor position after React re-renders
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
+      }
+    }, 0);
+    
+    // Only call onChange for complete times (with colon), not partial typing
+    if (formatted && formatted.includes(':')) {
       updateFullValue(formatted, period);
     }
   };
@@ -154,6 +167,7 @@ export function TimeInput({ value = '', onChange, placeholder = '9:00 AM', 'data
   return (
     <div className="flex space-x-2">
       <Input
+        ref={inputRef}
         value={timeValue}
         onChange={handleTimeChange}
         onBlur={handleBlur}
