@@ -40,73 +40,65 @@ export function TimeInput({ value = '', onChange, placeholder = '9:00 AM', 'data
 
   // Format time input as user types
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let input = e.target.value.replace(/[^\d]/g, ''); // Remove non-digits
+    const rawValue = e.target.value;
+    
+    // If user is deleting (empty or just contains colon), allow it
+    if (rawValue === '' || rawValue === ':') {
+      setTimeValue('');
+      onChange('');
+      return;
+    }
+    
+    // Extract only digits for processing
+    let digits = rawValue.replace(/[^\d]/g, '');
     
     // Limit to 4 digits max (HHMM)
-    if (input.length > 4) {
-      input = input.substring(0, 4);
+    if (digits.length > 4) {
+      digits = digits.substring(0, 4);
     }
     
     let formattedInput = '';
     
-    if (input.length === 0) {
+    if (digits.length === 0) {
       formattedInput = '';
-    } else if (input.length === 1) {
-      // Single digit hour (1-9)
-      const hour = parseInt(input);
-      if (hour >= 1 && hour <= 9) {
-        formattedInput = input;
-      } else {
-        formattedInput = '1'; // Default to 1 if invalid
-      }
-    } else if (input.length === 2) {
-      // Two digit hour (10-12) or hour with first minute digit
-      const hour = parseInt(input.substring(0, 2));
+    } else if (digits.length === 1) {
+      // Single digit (1-9)
+      formattedInput = digits;
+    } else if (digits.length === 2) {
+      const hour = parseInt(digits);
       if (hour >= 1 && hour <= 12) {
-        formattedInput = input;
+        // Valid 2-digit hour (01-12)
+        formattedInput = digits;
       } else if (hour > 12) {
-        // If hour > 12, treat first digit as hour and second as first minute digit
-        const firstDigit = parseInt(input.substring(0, 1));
-        const secondDigit = input.substring(1, 2);
-        if (firstDigit >= 1 && firstDigit <= 9) {
-          formattedInput = `${firstDigit}:${secondDigit}`;
-        } else {
-          formattedInput = '1:0';
-        }
+        // Split into H:M format (e.g., 13 -> 1:3, 25 -> 2:5)
+        formattedInput = `${digits[0]}:${digits[1]}`;
+      } else if (hour === 0) {
+        // Handle 00 as 12
+        formattedInput = '12';
       } else {
-        formattedInput = '1'; // Default to 1 if invalid
+        formattedInput = digits;
       }
-    } else if (input.length === 3) {
-      // HMM format - add colon after first digit or first two digits
-      const firstDigit = parseInt(input.substring(0, 1));
-      const hour = parseInt(input.substring(0, 2));
-      
-      if (hour >= 1 && hour <= 12) {
-        // Two digit hour (10-12)
-        formattedInput = `${input.substring(0, 2)}:${input.substring(2, 3)}`;
-      } else if (firstDigit >= 1 && firstDigit <= 9) {
-        // Single digit hour
-        formattedInput = `${input.substring(0, 1)}:${input.substring(1, 3)}`;
+    } else if (digits.length === 3) {
+      const firstTwo = parseInt(digits.substring(0, 2));
+      if (firstTwo >= 1 && firstTwo <= 12) {
+        // Two-digit hour (10-12) + one minute digit
+        formattedInput = `${digits.substring(0, 2)}:${digits.substring(2, 3)}`;
       } else {
-        formattedInput = '1:00';
+        // Single-digit hour + two minute digits
+        formattedInput = `${digits.substring(0, 1)}:${digits.substring(1, 3)}`;
       }
-    } else if (input.length === 4) {
-      // HHMM format
-      const firstDigit = parseInt(input.substring(0, 1));
-      const hour = parseInt(input.substring(0, 2));
-      
-      if (hour >= 1 && hour <= 12) {
-        // Two digit hour (10-12)
-        const minutes = parseInt(input.substring(2, 4));
-        const validMinutes = Math.min(59, Math.max(0, minutes));
-        formattedInput = `${input.substring(0, 2)}:${validMinutes.toString().padStart(2, '0')}`;
-      } else if (firstDigit >= 1 && firstDigit <= 9) {
-        // Single digit hour
-        const minutes = parseInt(input.substring(1, 4));
-        const validMinutes = Math.min(59, Math.max(0, minutes));
-        formattedInput = `${input.substring(0, 1)}:${validMinutes.toString().padStart(2, '0')}`;
+    } else if (digits.length === 4) {
+      const firstTwo = parseInt(digits.substring(0, 2));
+      if (firstTwo >= 1 && firstTwo <= 12) {
+        // Two-digit hour (01-12) + two minute digits
+        const minutes = parseInt(digits.substring(2, 4));
+        const validMinutes = Math.min(59, minutes);
+        formattedInput = `${digits.substring(0, 2)}:${validMinutes.toString().padStart(2, '0')}`;
       } else {
-        formattedInput = '1:00';
+        // Single-digit hour + three minute digits (take first two minutes)
+        const minutes = parseInt(digits.substring(1, 3));
+        const validMinutes = Math.min(59, minutes);
+        formattedInput = `${digits.substring(0, 1)}:${validMinutes.toString().padStart(2, '0')}`;
       }
     }
     
