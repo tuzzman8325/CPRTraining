@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Eye, EyeOff, User, Lock, Mail } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,22 +18,77 @@ export default function LoginForm() {
     password: '', 
     confirmPassword: '' 
   });
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { login } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login attempt:', loginData);
-    // TODO: Implement login functionality
+    
+    if (!loginData.username || !loginData.password) {
+      toast({
+        title: "Error",
+        description: "Please enter both username and password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await login(loginData.username, loginData.password);
+    setIsLoading(false);
+
+    if (result.success) {
+      toast({
+        title: "Success",
+        description: "Login successful",
+      });
+      setLocation('/');
+    } else {
+      toast({
+        title: "Login Failed",
+        description: result.error || "Invalid credentials",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Register attempt:', registerData);
+    
+    if (registerData.password !== registerData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // TODO: Implement registration functionality
+    console.log('Register attempt:', registerData);
   };
 
-  const handleAdminLogin = () => {
-    console.log('Admin login clicked');
-    // TODO: Implement admin login
+  const handleAdminLogin = async () => {
+    setIsLoading(true);
+    const result = await login('admin', 'admin123');
+    setIsLoading(false);
+
+    if (result.success) {
+      toast({
+        title: "Admin Login Successful",
+        description: "Welcome to the admin dashboard",
+      });
+      setLocation('/admin');
+    } else {
+      toast({
+        title: "Admin Login Failed",
+        description: result.error || "Failed to authenticate as admin",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -100,8 +158,8 @@ export default function LoginForm() {
                     </div>
                   </div>
                   
-                  <Button type="submit" className="w-full" data-testid="button-login">
-                    Sign In
+                  <Button type="submit" className="w-full" data-testid="button-login" disabled={isLoading}>
+                    {isLoading ? "Signing In..." : "Sign In"}
                   </Button>
                 </form>
               </CardContent>
@@ -112,8 +170,9 @@ export default function LoginForm() {
                   onClick={handleAdminLogin}
                   className="w-full"
                   data-testid="button-admin-login"
+                  disabled={isLoading}
                 >
-                  Admin Login
+                  {isLoading ? "Logging in..." : "Admin Login"}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center">
                   Don't have an account? Switch to the Register tab above.
