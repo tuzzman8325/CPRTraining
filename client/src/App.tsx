@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Home from "@/pages/Home";
 import Classes from "@/pages/Classes";
 import Calendar from "@/pages/Calendar";
@@ -18,7 +19,11 @@ function Router() {
       <Route path="/classes" component={Classes} />
       <Route path="/calendar" component={Calendar} />
       <Route path="/login" component={Login} />
-      <Route path="/admin" component={Admin} />
+      <Route path="/admin">
+        <ProtectedRoute requireAdmin={true}>
+          <Admin />
+        </ProtectedRoute>
+      </Route>
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
