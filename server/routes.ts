@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertClassSchema } from "@shared/schema";
+import { insertUserSchema, insertClassSchema, insertRegistrationSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -147,6 +147,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Delete class error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Registration routes
+  app.get("/api/registrations", async (req, res) => {
+    try {
+      const registrations = await storage.getRegistrations();
+      res.json({ success: true, registrations });
+    } catch (error) {
+      console.error("Get registrations error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/registrations/user/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const registrations = await storage.getRegistrationsByUser(userId);
+      res.json({ success: true, registrations });
+    } catch (error) {
+      console.error("Get user registrations error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/registrations/class/:classId", async (req, res) => {
+    try {
+      const { classId } = req.params;
+      const registrations = await storage.getRegistrationsByClass(classId);
+      res.json({ success: true, registrations });
+    } catch (error) {
+      console.error("Get class registrations error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/registrations", async (req, res) => {
+    try {
+      const registrationData = insertRegistrationSchema.parse(req.body);
+      
+      // Check if class exists and has availability
+      const classData = await storage.getClassById(registrationData.classId);
+      if (!classData) {
+        return res.status(404).json({ error: "Class not found" });
+      }
+      
+      if (classData.available <= 0) {
+        return res.status(400).json({ error: "Class is full" });
+      }
+
+      const registration = await storage.createRegistration(registrationData);
+      
+      res.status(201).json({ 
+        success: true, 
+        registration,
+        message: "Registration created successfully"
+      });
+    } catch (error) {
+      console.error("Create registration error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid registration data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/registrations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertRegistrationSchema.partial().parse(req.body);
+      
+      const updatedRegistration = await storage.updateRegistration(id, updates);
+      
+      if (!updatedRegistration) {
+        return res.status(404).json({ error: "Registration not found" });
+      }
+
+      res.json({ 
+        success: true, 
+        registration: updatedRegistration,
+        message: "Registration updated successfully"
+      });
+    } catch (error) {
+      console.error("Update registration error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid registration data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/registrations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteRegistration(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Registration not found" });
+      }
+
+      res.json({ 
+        success: true,
+        message: "Registration cancelled successfully"
+      });
+    } catch (error) {
+      console.error("Delete registration error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
