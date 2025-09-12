@@ -1,61 +1,37 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Calendar, Clock, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Clock, Users, Loader2 } from 'lucide-react';
+import { Class } from '@shared/schema';
 
-interface ClassEvent {
-  id: string;
-  title: string;
-  type: 'BLS' | 'Heartsaver';
+// Extend Class type to include a Date object for calendar display
+interface ClassEvent extends Omit<Class, 'date'> {
   date: Date;
-  time: string;
-  duration: string;
-  available: number;
-  capacity: number;
-  price: number;
 }
 
-// TODO: Remove mock data - replace with real class data from backend
-const mockClasses: ClassEvent[] = [
-  {
-    id: '1',
-    title: 'BLS Provider',
-    type: 'BLS',
-    date: new Date(2024, 2, 15), // March 15
-    time: '9:00 AM',
-    duration: '4 hours',
-    available: 5,
-    capacity: 12,
-    price: 85
-  },
-  {
-    id: '2',
-    title: 'Heartsaver CPR',
-    type: 'Heartsaver',
-    date: new Date(2024, 2, 18), // March 18
-    time: '2:00 PM',
-    duration: '3 hours',
-    available: 8,
-    capacity: 16,
-    price: 65
-  },
-  {
-    id: '3',
-    title: 'BLS Renewal',
-    type: 'BLS',
-    date: new Date(2024, 2, 22), // March 22
-    time: '10:00 AM',
-    duration: '3 hours',
-    available: 2,
-    capacity: 10,
-    price: 75
-  }
-];
+// Convert API date strings to Date objects for calendar display
+const convertClassesToEvents = (classes: Class[]): ClassEvent[] => {
+  return classes.map(cls => ({
+    ...cls,
+    date: new Date(cls.date + 'T00:00:00') // Add time to ensure local timezone
+  }));
+};
 
 export default function ClassCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedClass, setSelectedClass] = useState<ClassEvent | null>(null);
+
+  // Fetch classes from API
+  const { data: classesResponse, isLoading, error } = useQuery<{success: boolean; classes: Class[]}>({
+    queryKey: ['/api/classes'],
+  });
+
+  // Convert API response to ClassEvent objects
+  const classes = classesResponse?.success && classesResponse.classes 
+    ? convertClassesToEvents(classesResponse.classes) 
+    : [];
 
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
@@ -90,7 +66,7 @@ export default function ClassCalendar() {
 
   const getClassesForDate = (date: Date | null) => {
     if (!date) return [];
-    return mockClasses.filter(cls => 
+    return classes.filter(cls => 
       cls.date.toDateString() === date.toDateString()
     );
   };
@@ -116,6 +92,30 @@ export default function ClassCalendar() {
   };
 
   const days = getDaysInMonth(currentDate);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="text-muted-foreground">Loading classes...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-destructive mb-2">Failed to load classes</p>
+          <p className="text-muted-foreground text-sm">{error.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
