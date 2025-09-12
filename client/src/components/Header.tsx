@@ -2,19 +2,34 @@ import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen } from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator,
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen, Settings, LogOut, Shield } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import ekgLogo from '@assets/generated_images/EKG_line_logo_7cbd6728.png?url';
 
 export default function Header() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const [, setLocation] = useLocation();
 
   const navItems = [
     { href: '/', label: 'Home', icon: Heart },
     { href: '/classes', label: 'Classes', icon: BookOpen },
     { href: '/calendar', label: 'Calendar', icon: Calendar },
-    { href: '/login', label: 'Login', icon: User },
   ];
+
+  const handleLogout = () => {
+    logout();
+    setLocation('/');
+  };
 
   const isActive = (href: string) => location === href;
 
@@ -50,6 +65,55 @@ export default function Header() {
                 </Button>
               </Link>
             ))}
+            
+            {/* Auth Section */}
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center space-x-2" data-testid="button-user-menu">
+                    <User className="h-4 w-4" />
+                    <span>{user?.username}</span>
+                    {isAdmin && <Badge variant="destructive" className="text-xs">Admin</Badge>}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <div className="px-2 py-1.5 text-sm font-medium">
+                    {user?.username}
+                    <div className="text-xs text-muted-foreground">
+                      {isAdmin ? 'Administrator' : 'Client'}
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="flex items-center space-x-2 w-full">
+                          <Shield className="h-4 w-4" />
+                          <span>Admin Dashboard</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link href="/login">
+                <Button
+                  variant={isActive('/login') ? "default" : "ghost"}
+                  size="sm"
+                  className="flex items-center space-x-2"
+                  data-testid="link-login"
+                >
+                  <User className="h-4 w-4" />
+                  <span>Login</span>
+                </Button>
+              </Link>
+            )}
           </nav>
 
           {/* Contact Info - Desktop */}
@@ -74,6 +138,17 @@ export default function Header() {
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">
               <div className="flex flex-col space-y-4 mt-6">
+                {/* User Status - Mobile */}
+                {isAuthenticated && (
+                  <div className="px-3 py-2 bg-muted rounded-lg">
+                    <div className="font-medium">{user?.username}</div>
+                    <div className="text-sm text-muted-foreground flex items-center space-x-2">
+                      <span>{isAdmin ? 'Administrator' : 'Client'}</span>
+                      {isAdmin && <Badge variant="destructive" className="text-xs">Admin</Badge>}
+                    </div>
+                  </div>
+                )}
+                
                 {navItems.map(({ href, label, icon: Icon }) => (
                   <Link key={href} href={href} onClick={() => setIsOpen(false)}>
                     <Button
@@ -86,6 +161,47 @@ export default function Header() {
                     </Button>
                   </Link>
                 ))}
+                
+                {/* Auth Actions - Mobile */}
+                {isAuthenticated ? (
+                  <>
+                    {isAdmin && (
+                      <Link href="/admin" onClick={() => setIsOpen(false)}>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start space-x-2"
+                          data-testid="mobile-link-admin"
+                        >
+                          <Shield className="h-4 w-4" />
+                          <span>Admin Dashboard</span>
+                        </Button>
+                      </Link>
+                    )}
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start space-x-2"
+                      onClick={() => {
+                        handleLogout();
+                        setIsOpen(false);
+                      }}
+                      data-testid="mobile-button-logout"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Logout</span>
+                    </Button>
+                  </>
+                ) : (
+                  <Link href="/login" onClick={() => setIsOpen(false)}>
+                    <Button
+                      variant={isActive('/login') ? "default" : "ghost"}
+                      className="w-full justify-start space-x-2"
+                      data-testid="mobile-link-login"
+                    >
+                      <User className="h-4 w-4" />
+                      <span>Login</span>
+                    </Button>
+                  </Link>
+                )}
                 
                 <div className="border-t pt-4 mt-6">
                   <div className="space-y-2 text-sm">

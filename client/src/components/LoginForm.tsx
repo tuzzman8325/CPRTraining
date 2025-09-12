@@ -140,7 +140,8 @@ export default function LoginForm() {
         title: "Admin Login Successful",
         description: "Welcome to the admin dashboard",
       });
-      setLocation('/admin');
+      // Redirect to admin dashboard
+      setTimeout(() => setLocation('/admin'), 100);
     } else {
       toast({
         title: "Admin Login Failed",
