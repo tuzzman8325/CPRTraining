@@ -47,6 +47,18 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Class, InsertClass, insertClassSchema } from '@shared/schema';
+
+// API Response types
+interface ClassesResponse {
+  success: boolean;
+  classes: Class[];
+}
+
+interface ClassResponse {
+  success: boolean;
+  class: Class;
+  message: string;
+}
 import { 
   Search, 
   Plus, 
@@ -125,11 +137,11 @@ export default function AdminDashboard() {
   const [isEditClassDialogOpen, setIsEditClassDialogOpen] = useState(false);
   
   // React Query hooks for classes
-  const { data: classesData, isLoading: classesLoading } = useQuery({
+  const { data: classesData, isLoading: classesLoading } = useQuery<ClassesResponse>({
     queryKey: ['/api/classes'],
   });
   
-  const classes: Class[] = (classesData as any)?.classes || [];
+  const classes: Class[] = classesData?.classes || [];
   
   const createClassMutation = useMutation({
     mutationFn: async (data: InsertClass) => {
@@ -177,7 +189,12 @@ export default function AdminDashboard() {
   const addClassForm = useForm<InsertClass>({
     resolver: zodResolver(insertClassSchema.extend({
       date: insertClassSchema.shape.date.refine(
-        (date) => new Date(date) >= new Date(),
+        (date) => {
+          const inputDate = new Date(date + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return inputDate >= today;
+        },
         { message: "Date must be in the future" }
       ),
       capacity: insertClassSchema.shape.capacity.min(1, "Capacity must be at least 1"),
@@ -200,7 +217,12 @@ export default function AdminDashboard() {
   const editClassForm = useForm<InsertClass>({
     resolver: zodResolver(insertClassSchema.extend({
       date: insertClassSchema.shape.date.refine(
-        (date) => new Date(date) >= new Date(),
+        (date) => {
+          const inputDate = new Date(date + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return inputDate >= today;
+        },
         { message: "Date must be in the future" }
       ),
       capacity: insertClassSchema.shape.capacity.min(1, "Capacity must be at least 1"),
@@ -516,7 +538,7 @@ export default function AdminDashboard() {
                               {classItem.type}
                             </Badge>
                           </TableCell>
-                          <TableCell>{new Date(classItem.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{classItem.date}</TableCell>
                           <TableCell>{classItem.time}</TableCell>
                           <TableCell>{classItem.duration}</TableCell>
                           <TableCell>{classItem.capacity}</TableCell>
