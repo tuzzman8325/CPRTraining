@@ -42,69 +42,63 @@ export function TimeInput({ value = '', onChange, placeholder = '9:00 AM', 'data
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     
-    // If user is deleting (empty or just contains colon), allow it
-    if (rawValue === '' || rawValue === ':') {
+    // Allow completely empty field
+    if (rawValue === '') {
       setTimeValue('');
       onChange('');
       return;
     }
     
-    // Extract only digits for processing
-    let digits = rawValue.replace(/[^\d]/g, '');
+    // Extract digits only
+    const digits = rawValue.replace(/[^\d]/g, '');
     
-    // Limit to 4 digits max (HHMM)
-    if (digits.length > 4) {
-      digits = digits.substring(0, 4);
+    // If no digits, clear everything
+    if (digits === '') {
+      setTimeValue('');
+      onChange('');
+      return;
     }
     
-    let formattedInput = '';
+    // Limit to 4 digits max
+    const limitedDigits = digits.substring(0, 4);
     
-    if (digits.length === 0) {
-      formattedInput = '';
-    } else if (digits.length === 1) {
-      // Single digit (1-9)
-      formattedInput = digits;
-    } else if (digits.length === 2) {
-      const hour = parseInt(digits);
-      if (hour >= 1 && hour <= 12) {
-        // Valid 2-digit hour (01-12)
-        formattedInput = digits;
-      } else if (hour > 12) {
-        // Split into H:M format (e.g., 13 -> 1:3, 25 -> 2:5)
-        formattedInput = `${digits[0]}:${digits[1]}`;
-      } else if (hour === 0) {
-        // Handle 00 as 12
-        formattedInput = '12';
+    // Format based on number of digits
+    let formatted = '';
+    
+    if (limitedDigits.length === 1) {
+      // Just one digit: "9"
+      formatted = limitedDigits;
+    } else if (limitedDigits.length === 2) {
+      const num = parseInt(limitedDigits);
+      if (num <= 12) {
+        // Valid hour: "09" or "12"
+        formatted = limitedDigits;
       } else {
-        formattedInput = digits;
+        // Split into H:M: "13" becomes "1:3"
+        formatted = `${limitedDigits[0]}:${limitedDigits[1]}`;
       }
-    } else if (digits.length === 3) {
-      const firstTwo = parseInt(digits.substring(0, 2));
-      if (firstTwo >= 1 && firstTwo <= 12) {
-        // Two-digit hour (10-12) + one minute digit
-        formattedInput = `${digits.substring(0, 2)}:${digits.substring(2, 3)}`;
+    } else if (limitedDigits.length === 3) {
+      // For 3 digits, always treat as H:MM (more natural)
+      // "115" becomes "1:15", "930" becomes "9:30", "123" becomes "1:23"
+      formatted = `${limitedDigits[0]}:${limitedDigits.substring(1)}`;
+    } else if (limitedDigits.length === 4) {
+      const firstTwo = parseInt(limitedDigits.substring(0, 2));
+      if (firstTwo <= 12) {
+        // "1234" becomes "12:34"
+        const minutes = Math.min(59, parseInt(limitedDigits.substring(2)));
+        formatted = `${limitedDigits.substring(0, 2)}:${minutes.toString().padStart(2, '0')}`;
       } else {
-        // Single-digit hour + two minute digits
-        formattedInput = `${digits.substring(0, 1)}:${digits.substring(1, 3)}`;
-      }
-    } else if (digits.length === 4) {
-      const firstTwo = parseInt(digits.substring(0, 2));
-      if (firstTwo >= 1 && firstTwo <= 12) {
-        // Two-digit hour (01-12) + two minute digits
-        const minutes = parseInt(digits.substring(2, 4));
-        const validMinutes = Math.min(59, minutes);
-        formattedInput = `${digits.substring(0, 2)}:${validMinutes.toString().padStart(2, '0')}`;
-      } else {
-        // Single-digit hour + three minute digits (take first two minutes)
-        const minutes = parseInt(digits.substring(1, 3));
-        const validMinutes = Math.min(59, minutes);
-        formattedInput = `${digits.substring(0, 1)}:${validMinutes.toString().padStart(2, '0')}`;
+        // "2345" becomes "2:34" (ignore last digit)
+        const minutes = Math.min(59, parseInt(limitedDigits.substring(1, 3)));
+        formatted = `${limitedDigits[0]}:${minutes.toString().padStart(2, '0')}`;
       }
     }
     
-    setTimeValue(formattedInput);
-    if (formattedInput) {
-      updateFullValue(formattedInput, period);
+    setTimeValue(formatted);
+    
+    // Only call onChange if we have a valid formatted time
+    if (formatted) {
+      updateFullValue(formatted, period);
     }
   };
 
