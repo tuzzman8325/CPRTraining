@@ -32,6 +32,7 @@ import {
 import { 
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -45,9 +46,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Class, InsertClass, insertClassSchema, Registration } from '@shared/schema';
+import { Class, InsertClass, insertClassSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema } from '@shared/schema';
 import { z } from 'zod';
 
 // API Response types
@@ -66,6 +68,17 @@ interface RegistrationsResponse {
   success: boolean;
   registrations: Registration[];
 }
+
+interface DiscountCodesResponse {
+  success: boolean;
+  discountCodes: DiscountCode[];
+}
+
+interface DiscountCodeResponse {
+  success: boolean;
+  discountCode: DiscountCode;
+  message: string;
+}
 import { 
   Search, 
   Plus, 
@@ -77,7 +90,9 @@ import {
   Award,
   DollarSign,
   BookOpen,
-  ClipboardList
+  ClipboardList,
+  Ticket,
+  Copy
 } from 'lucide-react';
 
 interface Client {
@@ -146,6 +161,12 @@ export default function AdminDashboard() {
 
   // Registration state
   const [registrationSearchTerm, setRegistrationSearchTerm] = useState('');
+
+  // Discount Code state
+  const [discountCodeSearchTerm, setDiscountCodeSearchTerm] = useState('');
+  const [selectedDiscountCode, setSelectedDiscountCode] = useState<DiscountCode | null>(null);
+  const [isAddDiscountCodeDialogOpen, setIsAddDiscountCodeDialogOpen] = useState(false);
+  const [isEditDiscountCodeDialogOpen, setIsEditDiscountCodeDialogOpen] = useState(false);
   
   // React Query hooks for classes
   const { data: classesData, isLoading: classesLoading } = useQuery<ClassesResponse>({
@@ -156,8 +177,14 @@ export default function AdminDashboard() {
   const { data: registrationsData, isLoading: registrationsLoading } = useQuery<RegistrationsResponse>({
     queryKey: ['/api/registrations'],
   });
+
+  // React Query hooks for discount codes
+  const { data: discountCodesData, isLoading: discountCodesLoading } = useQuery<DiscountCodesResponse>({
+    queryKey: ['/api/discount-codes'],
+  });
   
   const classes: Class[] = classesData?.classes || [];
+  const discountCodes: DiscountCode[] = discountCodesData?.discountCodes || [];
   
   const createClassMutation = useMutation({
     mutationFn: async (data: InsertClass) => {
@@ -213,6 +240,49 @@ export default function AdminDashboard() {
       toast({ title: "Error", description: `Failed to delete registration: ${error.message}`, variant: "destructive" });
     }
   });
+
+  // Discount Code mutations
+  const createDiscountCodeMutation = useMutation({
+    mutationFn: async (data: InsertDiscountCode) => {
+      return await apiRequest('POST', '/api/discount-codes', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/discount-codes'] });
+      setIsAddDiscountCodeDialogOpen(false);
+      toast({ title: "Success", description: "Discount code created successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to create discount code: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const updateDiscountCodeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertDiscountCode> }) => {
+      return await apiRequest('PUT', `/api/discount-codes/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/discount-codes'] });
+      setIsEditDiscountCodeDialogOpen(false);
+      setSelectedDiscountCode(null);
+      toast({ title: "Success", description: "Discount code updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to update discount code: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const deleteDiscountCodeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/discount-codes/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/discount-codes'] });
+      toast({ title: "Success", description: "Discount code deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to delete discount code: ${error.message}`, variant: "destructive" });
+    }
+  });
   
   // Form setup for adding classes
   const addClassForm = useForm<InsertClass>({
@@ -260,6 +330,28 @@ export default function AdminDashboard() {
     })),
   });
 
+  // Form setup for adding discount codes
+  const addDiscountCodeForm = useForm<InsertDiscountCode>({
+    resolver: zodResolver(insertDiscountCodeSchema.extend({
+      maxUses: z.coerce.number().min(1, "Max uses must be at least 1").optional().nullable(),
+    })),
+    defaultValues: {
+      code: '',
+      expiresAt: '',
+      isActive: true,
+      maxUses: null,
+      description: '',
+      createdBy: 'admin'
+    }
+  });
+
+  // Form setup for editing discount codes
+  const editDiscountCodeForm = useForm<InsertDiscountCode>({
+    resolver: zodResolver(insertDiscountCodeSchema.extend({
+      maxUses: z.coerce.number().min(1, "Max uses must be at least 1").optional().nullable(),
+    })),
+  });
+
   const filteredClients = clients.filter(client =>
     client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -278,6 +370,12 @@ export default function AdminDashboard() {
     registration.firstName.toLowerCase().includes(registrationSearchTerm.toLowerCase()) ||
     registration.lastName.toLowerCase().includes(registrationSearchTerm.toLowerCase()) ||
     registration.email.toLowerCase().includes(registrationSearchTerm.toLowerCase())
+  );
+
+  const filteredDiscountCodes = discountCodes.filter(code =>
+    code.code.toLowerCase().includes(discountCodeSearchTerm.toLowerCase()) ||
+    (code.description && code.description.toLowerCase().includes(discountCodeSearchTerm.toLowerCase())) ||
+    code.createdBy.toLowerCase().includes(discountCodeSearchTerm.toLowerCase())
   );
 
   // Client handlers
@@ -348,6 +446,51 @@ export default function AdminDashboard() {
     }
   };
 
+  // Discount Code handlers
+  const handleAddDiscountCode = () => {
+    addDiscountCodeForm.reset();
+    setIsAddDiscountCodeDialogOpen(true);
+  };
+
+  const handleEditDiscountCode = (discountCode: DiscountCode) => {
+    setSelectedDiscountCode(discountCode);
+    editDiscountCodeForm.reset({
+      code: discountCode.code,
+      expiresAt: new Date(discountCode.expiresAt).toISOString().split('T')[0],
+      isActive: discountCode.isActive,
+      maxUses: discountCode.maxUses,
+      description: discountCode.description || '',
+      createdBy: discountCode.createdBy
+    });
+    setIsEditDiscountCodeDialogOpen(true);
+  };
+
+  const handleDeleteDiscountCode = (discountCodeId: string) => {
+    if (window.confirm('Are you sure you want to delete this discount code?')) {
+      deleteDiscountCodeMutation.mutate(discountCodeId);
+    }
+  };
+
+  const onAddDiscountCodeSubmit = (data: InsertDiscountCode) => {
+    createDiscountCodeMutation.mutate(data);
+  };
+
+  const onEditDiscountCodeSubmit = (data: InsertDiscountCode) => {
+    if (selectedDiscountCode) {
+      updateDiscountCodeMutation.mutate({ id: selectedDiscountCode.id, data });
+    }
+  };
+
+  const copyDiscountCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast({ title: "Copied!", description: `Discount code "${code}" copied to clipboard` });
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      toast({ title: "Copy failed", description: "Failed to copy to clipboard", variant: "destructive" });
+    }
+  };
+
   const stats = {
     totalClients: clients.length,
     activeClients: clients.filter(c => c.status === 'Active').length,
@@ -376,6 +519,10 @@ export default function AdminDashboard() {
             <Button onClick={handleAddClass} data-testid="button-add-class">
               <Plus className="h-4 w-4 mr-2" />
               Add Class
+            </Button>
+            <Button onClick={handleAddDiscountCode} data-testid="button-add-discount-code">
+              <Ticket className="h-4 w-4 mr-2" />
+              Add Discount Code
             </Button>
           </div>
         </div>
@@ -741,6 +888,134 @@ export default function AdminDashboard() {
                                     className="text-destructive"
                                   >
                                     <Trash className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Discount Code Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Discount Code Management</CardTitle>
+            <CardDescription>Create and manage discount codes for free class registrations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Search */}
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search discount codes by code or description..."
+                value={discountCodeSearchTerm}
+                onChange={(e) => setDiscountCodeSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-discount-codes"
+              />
+            </div>
+
+            {/* Discount Codes Table */}
+            {discountCodesLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="text-muted-foreground">Loading discount codes...</div>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead>Usage</TableHead>
+                      <TableHead>Created By</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDiscountCodes.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No discount codes found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredDiscountCodes.map((code) => {
+                        const isExpired = new Date() > new Date(code.expiresAt);
+                        const isMaxedOut = code.maxUses && code.usedCount >= code.maxUses;
+                        
+                        return (
+                          <TableRow key={code.id} data-testid={`row-discount-code-${code.id}`}>
+                            <TableCell className="font-mono font-medium">
+                              <div className="flex items-center gap-2">
+                                {code.code}
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  onClick={() => copyDiscountCode(code.code)}
+                                  data-testid={`button-copy-${code.code}`}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={
+                                  !code.isActive ? 'secondary' : 
+                                  isExpired ? 'destructive' : 
+                                  isMaxedOut ? 'secondary' : 
+                                  'default'
+                                }
+                              >
+                                {!code.isActive ? 'Inactive' : 
+                                 isExpired ? 'Expired' : 
+                                 isMaxedOut ? 'Max Used' : 
+                                 'Active'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <span className={isExpired ? 'text-destructive' : ''}>
+                                {new Date(code.expiresAt).toLocaleDateString()}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span>
+                                {code.usedCount}
+                                {code.maxUses ? ` / ${code.maxUses}` : ' / ∞'}
+                              </span>
+                            </TableCell>
+                            <TableCell>{code.createdBy}</TableCell>
+                            <TableCell className="max-w-xs truncate">
+                              {code.description || '-'}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" data-testid={`button-actions-${code.id}`}>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditDiscountCode(code)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteDiscountCode(code.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash className="mr-2 h-4 w-4" />
                                     Delete
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -1144,6 +1419,262 @@ export default function AdminDashboard() {
                       {updateClassMutation.isPending ? 'Updating...' : 'Update Class'}
                     </Button>
                   </DialogFooter>
+                </form>
+              </Form>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Discount Code Dialog */}
+        <Dialog open={isAddDiscountCodeDialogOpen} onOpenChange={setIsAddDiscountCodeDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Discount Code</DialogTitle>
+              <DialogDescription>
+                Create a new discount code to provide free class access
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Form {...addDiscountCodeForm}>
+              <form onSubmit={addDiscountCodeForm.handleSubmit(onAddDiscountCodeSubmit)} className="space-y-4">
+                <FormField
+                  control={addDiscountCodeForm.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Discount Code</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="ABCD-EFGH" 
+                          {...field} 
+                          className="font-mono"
+                          data-testid="input-add-discount-code"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        8 characters in ABCD-EFGH format (letters and numbers only)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={addDiscountCodeForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., Promotional code for January" 
+                          {...field} 
+                          data-testid="input-add-discount-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={addDiscountCodeForm.control}
+                  name="expiresAt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Expiration Date</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="date" 
+                          {...field} 
+                          data-testid="input-add-discount-expires"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={addDiscountCodeForm.control}
+                  name="maxUses"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max Uses (Optional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="Leave empty for unlimited" 
+                          {...field} 
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                          data-testid="input-add-discount-max-uses"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Leave empty for unlimited uses
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsAddDiscountCodeDialogOpen(false)}
+                    data-testid="button-cancel-add-discount"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createDiscountCodeMutation.isPending}
+                    data-testid="button-create-discount"
+                  >
+                    {createDiscountCodeMutation.isPending ? "Creating..." : "Create Code"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Discount Code Dialog */}
+        <Dialog open={isEditDiscountCodeDialogOpen} onOpenChange={setIsEditDiscountCodeDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Discount Code</DialogTitle>
+              <DialogDescription>
+                Update the discount code settings
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedDiscountCode && (
+              <Form {...editDiscountCodeForm}>
+                <form onSubmit={editDiscountCodeForm.handleSubmit(onEditDiscountCodeSubmit)} className="space-y-4">
+                  <FormField
+                    control={editDiscountCodeForm.control}
+                    name="code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Discount Code</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="ABCD-EFGH" 
+                            {...field} 
+                            className="font-mono"
+                            data-testid="input-edit-discount-code"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          8 characters in ABCD-EFGH format (letters and numbers only)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editDiscountCodeForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g., Promotional code for January" 
+                            {...field} 
+                            data-testid="input-edit-discount-description"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editDiscountCodeForm.control}
+                    name="expiresAt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Expiration Date</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            {...field} 
+                            data-testid="input-edit-discount-expires"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editDiscountCodeForm.control}
+                    name="maxUses"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Max Uses (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            placeholder="Leave empty for unlimited" 
+                            {...field} 
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                            data-testid="input-edit-discount-max-uses"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Leave empty for unlimited uses
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editDiscountCodeForm.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Active Status</FormLabel>
+                          <FormDescription>
+                            Enable or disable this discount code
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-edit-discount-active"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="flex justify-end gap-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsEditDiscountCodeDialogOpen(false)}
+                      data-testid="button-cancel-edit-discount"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={updateDiscountCodeMutation.isPending}
+                      data-testid="button-update-discount"
+                    >
+                      {updateDiscountCodeMutation.isPending ? "Updating..." : "Update Code"}
+                    </Button>
+                  </div>
                 </form>
               </Form>
             )}

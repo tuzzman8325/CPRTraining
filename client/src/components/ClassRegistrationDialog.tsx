@@ -15,14 +15,17 @@ import { Class } from '@shared/schema';
 
 // Make sure to call `loadStripe` outside of a component's render to avoid
 // recreating the `Stripe` object on every render.
-const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+// Load Stripe conditionally only when needed
+const getStripePromise = () => {
+  const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+  
+  if (!stripePublicKey) {
+    throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
+  }
 
-if (!stripePublicKey) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-
-console.log(`Loading Stripe in ${import.meta.env.DEV ? 'development' : 'production'} mode`);
-const stripePromise = loadStripe(stripePublicKey);
+  console.log(`Loading Stripe in ${import.meta.env.DEV ? 'development' : 'production'} mode`);
+  return loadStripe(stripePublicKey);
+};
 
 const registrationSchema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
@@ -170,8 +173,9 @@ const DiscountCodeForm = ({ onValidCode, onProceedWithPayment, onCancel }: Disco
 };
 
 const RegistrationForm = ({ classData, clientSecret, paymentIntentId, discountCode, onSuccess, onCancel }: RegistrationFormProps) => {
-  const stripe = useStripe();
-  const elements = useElements();
+  // Only use Stripe hooks when payment is needed (no discount code)
+  const stripe = !discountCode ? useStripe() : null;
+  const elements = !discountCode ? useElements() : null;
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -524,7 +528,7 @@ export default function ClassRegistrationDialog({ isOpen, onClose, classData }: 
               <span className="ml-2">Initializing payment...</span>
             </div>
           ) : clientSecret ? (
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <Elements stripe={getStripePromise()} options={{ clientSecret }}>
               <RegistrationForm
                 classData={classData}
                 clientSecret={clientSecret}
