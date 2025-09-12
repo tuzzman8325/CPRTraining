@@ -73,6 +73,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/classes", async (req, res) => {
     try {
       const classes = await storage.getClasses();
+      console.log("Database query result:", classes);
+      console.log("Number of classes found:", classes.length);
       res.json({ success: true, classes });
     } catch (error) {
       console.error("Get classes error:", error);

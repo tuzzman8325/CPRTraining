@@ -1,5 +1,8 @@
 import { type User, type InsertUser, type Class, type InsertClass, type Registration, type InsertRegistration } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { users, classes, registrations } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -153,4 +156,86 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DbStorage implements IStorage {
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  // Class CRUD operations
+  async getClasses(): Promise<Class[]> {
+    return await db.select().from(classes);
+  }
+
+  async getClassById(id: string): Promise<Class | undefined> {
+    const result = await db.select().from(classes).where(eq(classes.id, id));
+    return result[0];
+  }
+
+  async createClass(insertClass: InsertClass): Promise<Class> {
+    const result = await db.insert(classes).values(insertClass).returning();
+    return result[0];
+  }
+
+  async updateClass(id: string, updates: Partial<InsertClass>): Promise<Class | undefined> {
+    const result = await db.update(classes).set(updates).where(eq(classes.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteClass(id: string): Promise<boolean> {
+    const result = await db.delete(classes).where(eq(classes.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Registration CRUD operations
+  async getRegistrations(): Promise<Registration[]> {
+    return await db.select().from(registrations);
+  }
+
+  async getRegistrationsByUser(userId: string): Promise<Registration[]> {
+    return await db.select().from(registrations).where(eq(registrations.userId, userId));
+  }
+
+  async getRegistrationsByClass(classId: string): Promise<Registration[]> {
+    return await db.select().from(registrations).where(eq(registrations.classId, classId));
+  }
+
+  async createRegistration(insertRegistration: InsertRegistration): Promise<Registration> {
+    const result = await db.insert(registrations).values(insertRegistration).returning();
+    
+    // Update class availability
+    if (result[0]) {
+      await db.execute(sql`UPDATE classes SET available = available - 1 WHERE id = ${insertRegistration.classId} AND available > 0`);
+    }
+    
+    return result[0];
+  }
+
+  async updateRegistration(id: string, updates: Partial<InsertRegistration>): Promise<Registration | undefined> {
+    const result = await db.update(registrations).set(updates).where(eq(registrations.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteRegistration(id: string): Promise<boolean> {
+    const registration = await db.select().from(registrations).where(eq(registrations.id, id));
+    if (registration[0]) {
+      // Update class availability when registration is deleted
+      await db.execute(sql`UPDATE classes SET available = available + 1 WHERE id = ${registration[0].classId}`);
+    }
+    
+    const result = await db.delete(registrations).where(eq(registrations.id, id));
+    return result.rowCount > 0;
+  }
+}
+
+export const storage = new DbStorage();
