@@ -384,6 +384,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/discount-codes/use", async (req, res) => {
+    try {
+      const { code } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ error: "Discount code is required" });
+      }
+      
+      const success = await storage.useDiscountCode(code);
+      
+      if (success) {
+        res.json({ 
+          success: true,
+          message: "Discount code used successfully"
+        });
+      } else {
+        res.status(400).json({ 
+          success: false,
+          error: "Failed to use discount code"
+        });
+      }
+    } catch (error) {
+      console.error("Use discount code error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Stripe payment endpoint for class registration
   app.post("/api/create-payment-intent", async (req, res) => {
     try {

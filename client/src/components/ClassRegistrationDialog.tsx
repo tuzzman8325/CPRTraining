@@ -31,17 +31,145 @@ const registrationSchema = z.object({
   phone: z.string().optional(),
 });
 
+const discountCodeSchema = z.object({
+  code: z.string().min(1, 'Please enter a discount code'),
+});
+
 type RegistrationFormData = z.infer<typeof registrationSchema>;
+type DiscountCodeData = z.infer<typeof discountCodeSchema>;
 
 interface RegistrationFormProps {
   classData: Class;
-  clientSecret: string;
-  paymentIntentId: string;
+  clientSecret?: string;
+  paymentIntentId?: string;
+  discountCode?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess, onCancel }: RegistrationFormProps) => {
+interface DiscountCodeFormProps {
+  onValidCode: (code: string) => void;
+  onProceedWithPayment: () => void;
+  onCancel: () => void;
+}
+
+const DiscountCodeForm = ({ onValidCode, onProceedWithPayment, onCancel }: DiscountCodeFormProps) => {
+  const [isValidating, setIsValidating] = useState(false);
+  const { toast } = useToast();
+
+  const { register, handleSubmit, formState: { errors }, watch } = useForm<DiscountCodeData>({
+    resolver: zodResolver(discountCodeSchema),
+  });
+
+  const codeValue = watch('code');
+
+  const validateCode = async (data: DiscountCodeData) => {
+    setIsValidating(true);
+    
+    try {
+      const response = await apiRequest('POST', '/api/validate-discount-code', {
+        code: data.code.toUpperCase()
+      });
+
+      const result = await response.json();
+      console.log('Discount code validation:', result);
+
+      if (result.success && result.valid) {
+        toast({
+          title: "Valid Discount Code!",
+          description: "This code provides free registration for this class.",
+        });
+        onValidCode(data.code.toUpperCase());
+      } else {
+        toast({
+          title: "Invalid Code",
+          description: result.reason || "This discount code is not valid.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Discount code validation error:', error);
+      toast({
+        title: "Validation Error",
+        description: "Failed to validate discount code. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h3 className="text-lg font-medium mb-2">Registration Options</h3>
+        <p className="text-sm text-muted-foreground">
+          Have a discount code? Enter it below for free registration, or proceed with payment.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit(validateCode)} className="space-y-4">
+        <div>
+          <Label htmlFor="discountCode">Discount Code (Optional)</Label>
+          <Input
+            id="discountCode"
+            {...register('code')}
+            data-testid="input-discount-code"
+            placeholder="ABCD-EFGH"
+            className={`uppercase ${errors.code ? 'border-destructive' : ''}`}
+            onChange={(e) => {
+              e.target.value = e.target.value.toUpperCase();
+              register('code').onChange(e);
+            }}
+          />
+          {errors.code && (
+            <p className="text-sm text-destructive mt-1">{errors.code.message}</p>
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            type="submit"
+            disabled={!codeValue || isValidating}
+            data-testid="button-validate-code"
+            className="flex-1"
+          >
+            {isValidating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Validating...
+              </>
+            ) : (
+              'Apply Code'
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onProceedWithPayment}
+            data-testid="button-proceed-payment"
+            className="flex-1"
+          >
+            Pay Instead
+          </Button>
+        </div>
+      </form>
+
+      <div className="text-center">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          data-testid="button-cancel-discount"
+        >
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const RegistrationForm = ({ classData, clientSecret, paymentIntentId, discountCode, onSuccess, onCancel }: RegistrationFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -52,18 +180,65 @@ const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess,
   });
 
   const onSubmit = async (formData: RegistrationFormData) => {
-    if (!stripe || !elements) {
-      toast({
-        title: "Payment Error",
-        description: "Stripe is not ready. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
+      // Handle discount code registration (no payment needed)
+      if (discountCode) {
+        console.log('Processing discount code registration...');
+        const registrationData = {
+          classId: classData.id,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone || null,
+          paymentIntentId: null,
+          amountPaid: null,
+          status: 'confirmed',
+          discountCodeId: null // This will be handled by the backend
+        };
+
+        // Mark the discount code as used
+        const codeResponse = await apiRequest('POST', '/api/discount-codes/use', {
+          code: discountCode
+        });
+
+        if (!codeResponse.ok) {
+          throw new Error('Failed to apply discount code');
+        }
+
+        console.log('Registration data (discount):', registrationData);
+        
+        const registrationResponse = await apiRequest('POST', '/api/registrations', registrationData);
+        console.log('Registration response:', registrationResponse);
+        
+        if (!registrationResponse.ok) {
+          const errorData = await registrationResponse.json();
+          console.error('Registration failed:', errorData);
+          throw new Error(errorData.error || 'Registration failed');
+        }
+        
+        console.log('Discount registration successful!');
+
+        toast({
+          title: "Registration Successful!",
+          description: `You have been registered for ${classData.title} using your discount code. You will receive a confirmation email shortly.`,
+        });
+
+        onSuccess();
+        return;
+      }
+
+      // Handle payment registration
+      if (!stripe || !elements) {
+        toast({
+          title: "Payment Error",
+          description: "Stripe is not ready. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Confirm the payment
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
@@ -93,7 +268,7 @@ const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess,
           amountPaid: paymentIntent.amount,
           status: 'confirmed'
         };
-        console.log('Registration data:', registrationData);
+        console.log('Registration data (payment):', registrationData);
         
         try {
           const registrationResponse = await apiRequest('POST', '/api/registrations', registrationData);
@@ -186,10 +361,23 @@ const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess,
           />
         </div>
 
-        <div className="border rounded-lg p-4 bg-muted/50">
-          <Label className="text-sm font-medium mb-2 block">Payment Information</Label>
-          <PaymentElement />
-        </div>
+        {discountCode && (
+          <div className="border rounded-lg p-4 bg-green-50 dark:bg-green-950">
+            <Label className="text-sm font-medium mb-2 block text-green-800 dark:text-green-200">
+              Discount Code Applied
+            </Label>
+            <p className="text-sm text-green-700 dark:text-green-300">
+              Code <strong>{discountCode}</strong> applied - Registration is free!
+            </p>
+          </div>
+        )}
+
+        {!discountCode && clientSecret && (
+          <div className="border rounded-lg p-4 bg-muted/50">
+            <Label className="text-sm font-medium mb-2 block">Payment Information</Label>
+            <PaymentElement />
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between pt-6 mt-6 border-t bg-background flex-shrink-0">
@@ -204,7 +392,7 @@ const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess,
         </Button>
         <Button
           type="submit"
-          disabled={!stripe || isSubmitting}
+          disabled={discountCode ? isSubmitting : (!stripe || isSubmitting)}
           data-testid="button-complete-registration"
           className="min-w-[140px]"
         >
@@ -213,6 +401,8 @@ const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess,
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Processing...
             </>
+          ) : discountCode ? (
+            'Complete Free Registration'
           ) : (
             `Pay $${classData.price} & Register`
           )}
@@ -231,6 +421,8 @@ interface ClassRegistrationDialogProps {
 export default function ClassRegistrationDialog({ isOpen, onClose, classData }: ClassRegistrationDialogProps) {
   const [clientSecret, setClientSecret] = useState<string>("");
   const [paymentIntentId, setPaymentIntentId] = useState<string>("");
+  const [discountCode, setDiscountCode] = useState<string>("");
+  const [showDiscountForm, setShowDiscountForm] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -266,17 +458,28 @@ export default function ClassRegistrationDialog({ isOpen, onClose, classData }: 
     }
   };
 
-  // Initialize payment when dialog opens and class data is available
+  // Initialize payment when proceeding with payment (not on dialog open)
   useEffect(() => {
-    if (isOpen && classData && !clientSecret) {
+    if (isOpen && classData && !clientSecret && !showDiscountForm && !discountCode) {
       initializePayment();
     }
-  }, [isOpen, classData, clientSecret]);
+  }, [isOpen, classData, clientSecret, showDiscountForm, discountCode]);
 
   const handleClose = () => {
     setClientSecret("");
     setPaymentIntentId("");
+    setDiscountCode("");
+    setShowDiscountForm(true);
     onClose();
+  };
+
+  const handleValidDiscountCode = (code: string) => {
+    setDiscountCode(code);
+    setShowDiscountForm(false);
+  };
+
+  const handleProceedWithPayment = () => {
+    setShowDiscountForm(false);
   };
 
   const handleSuccess = () => {
@@ -302,7 +505,20 @@ export default function ClassRegistrationDialog({ isOpen, onClose, classData }: 
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
+          {showDiscountForm ? (
+            <DiscountCodeForm
+              onValidCode={handleValidDiscountCode}
+              onProceedWithPayment={handleProceedWithPayment}
+              onCancel={handleClose}
+            />
+          ) : discountCode ? (
+            <RegistrationForm
+              classData={classData}
+              discountCode={discountCode}
+              onSuccess={handleSuccess}
+              onCancel={handleClose}
+            />
+          ) : isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
               <span className="ml-2">Initializing payment...</span>
