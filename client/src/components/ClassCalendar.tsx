@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, Calendar, Clock, Users, Loader2 } from 'lucide-react';
 import { Class } from '@shared/schema';
+import ClassRegistrationDialog from '@/components/ClassRegistrationDialog';
 
 // Extend Class type to include a Date object for calendar display
 interface ClassEvent extends Omit<Class, 'date'> {
@@ -22,6 +23,8 @@ const convertClassesToEvents = (classes: Class[]): ClassEvent[] => {
 export default function ClassCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedClass, setSelectedClass] = useState<ClassEvent | null>(null);
+  const [registrationClass, setRegistrationClass] = useState<Class | null>(null);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
 
   // Fetch classes from API
   const { data: classesResponse, isLoading, error } = useQuery<{success: boolean; classes: Class[]}>({
@@ -87,8 +90,18 @@ export default function ClassCalendar() {
   };
 
   const handleRegister = (cls: ClassEvent) => {
-    console.log('Register for class:', cls.title);
-    // TODO: Implement registration flow
+    // Convert ClassEvent back to Class for the registration dialog
+    const classForRegistration: Class = {
+      ...cls,
+      date: cls.date.toISOString().split('T')[0] // Convert Date back to YYYY-MM-DD string
+    };
+    setRegistrationClass(classForRegistration);
+    setIsRegistrationOpen(true);
+  };
+
+  const handleRegistrationClose = () => {
+    setIsRegistrationOpen(false);
+    setRegistrationClass(null);
   };
 
   const days = getDaysInMonth(currentDate);
@@ -261,6 +274,13 @@ export default function ClassCalendar() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Registration Dialog */}
+      <ClassRegistrationDialog
+        isOpen={isRegistrationOpen}
+        onClose={handleRegistrationClose}
+        classData={registrationClass}
+      />
     </div>
   );
 }

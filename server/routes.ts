@@ -1,7 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import Stripe from "stripe";
 import { storage } from "./storage";
 import { insertUserSchema, insertClassSchema, insertRegistrationSchema } from "@shared/schema";
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2025-08-27.basil",
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -255,6 +263,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete registration error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Stripe payment endpoint for class registration
+  app.post("/api/create-payment-intent", async (req, res) => {
+    try {
+      const { amount, classId, classTitle } = req.body;
+      
+      if (!amount || !classId) {
+        return res.status(400).json({ error: "Amount and class ID are required" });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: "usd",
+        metadata: {
+          classId,
+          classTitle: classTitle || "CPR Training Class"
+        }
+      });
+      
+      res.json({ 
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id
+      });
+    } catch (error: any) {
+      console.error("Create payment intent error:", error);
+      res.status(500).json({ 
+        error: "Error creating payment intent", 
+        message: error.message 
+      });
     }
   });
 

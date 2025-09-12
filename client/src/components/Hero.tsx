@@ -1,11 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Shield, Users, Award } from 'lucide-react';
+import { useLocation } from 'wouter';
 import heroImage from '@assets/generated_images/CPR_training_hero_image_7815ecc9.png';
 
 export default function Hero() {
+  const [, setLocation] = useLocation();
+  
   const handleRegisterClick = () => {
-    console.log('Navigate to class registration');
-    // TODO: Implement navigation to class registration
+    setLocation('/classes');
   };
 
   const handleLearnMoreClick = () => {

@@ -1,5 +1,8 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import ClassRegistrationDialog from '@/components/ClassRegistrationDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,15 +15,43 @@ import {
   Calendar,
   DollarSign,
   Heart,
-  Stethoscope
+  Stethoscope,
+  Loader2
 } from 'lucide-react';
+import { Class } from '@shared/schema';
 import blsImage from '@assets/generated_images/BLS_provider_training_a0cd6457.png';
 import heartsaverImage from '@assets/generated_images/Heartsaver_community_training_b3867bec.png';
 
 export default function Classes() {
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+
+  // Fetch available classes from API
+  const { data: classesData, isLoading } = useQuery({
+    queryKey: ['/api/classes'],
+    select: (response: any) => response.classes,
+  });
+
+  const classes = classesData || [];
+  
   const handleRegister = (courseType: string) => {
-    console.log(`Register for ${courseType} course`);
-    // TODO: Implement registration flow
+    // Find an available class of the selected type
+    const availableClass = classes.find((cls: Class) => 
+      cls.type === courseType && cls.available > 0
+    );
+    
+    if (availableClass) {
+      setSelectedClass(availableClass);
+      setIsRegistrationOpen(true);
+    } else {
+      // For static course info display when no specific class is scheduled
+      console.log(`No available ${courseType} classes currently scheduled`);
+    }
+  };
+
+  const handleRegistrationClose = () => {
+    setIsRegistrationOpen(false);
+    setSelectedClass(null);
   };
 
   return (
@@ -118,8 +149,16 @@ export default function Classes() {
                       size="lg"
                       className="w-full"
                       data-testid="button-register-bls"
+                      disabled={isLoading}
                     >
-                      Register for BLS Provider Course
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading Classes...
+                        </>
+                      ) : (
+                        "Register for BLS Provider Course"
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -203,8 +242,16 @@ export default function Classes() {
                       size="lg"
                       className="w-full"
                       data-testid="button-register-heartsaver"
+                      disabled={isLoading}
                     >
-                      Register for Heartsaver Course
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading Classes...
+                        </>
+                      ) : (
+                        "Register for Heartsaver Course"
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -225,7 +272,12 @@ export default function Classes() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
-                    <Button variant="outline" size="lg" data-testid="button-view-schedule">
+                    <Button 
+                      variant="outline" 
+                      size="lg" 
+                      data-testid="button-view-schedule"
+                      onClick={() => window.location.href = '/calendar'}
+                    >
                       <Calendar className="mr-2 h-5 w-5" />
                       View Class Schedule
                     </Button>
@@ -244,6 +296,13 @@ export default function Classes() {
       </main>
 
       <Footer />
+      
+      {/* Registration Dialog */}
+      <ClassRegistrationDialog
+        isOpen={isRegistrationOpen}
+        onClose={handleRegistrationClose}
+        classData={selectedClass}
+      />
     </div>
   );
 }
