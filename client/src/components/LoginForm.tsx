@@ -67,8 +67,67 @@ export default function LoginForm() {
       return;
     }
 
-    // TODO: Implement registration functionality
-    console.log('Register attempt:', registerData);
+    if (!registerData.username || !registerData.email || !registerData.password) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: registerData.username,
+          password: registerData.password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({
+          title: "Registration Failed",
+          description: data.error || "Registration failed",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.success) {
+        toast({
+          title: "Registration Successful",
+          description: "Account created successfully! You can now log in.",
+        });
+        
+        // Clear form and switch to login tab
+        setRegisterData({
+          username: '', 
+          email: '', 
+          password: '', 
+          confirmPassword: '' 
+        });
+        
+        // Note: We could auto-switch to login tab here if needed
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast({
+        title: "Registration Failed",
+        description: "Network error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleAdminLogin = async () => {
@@ -261,8 +320,8 @@ export default function LoginForm() {
                     </div>
                   </div>
                   
-                  <Button type="submit" className="w-full" data-testid="button-register">
-                    Create Account
+                  <Button type="submit" className="w-full" data-testid="button-register" disabled={isLoading}>
+                    {isLoading ? "Creating Account..." : "Create Account"}
                   </Button>
                 </form>
               </CardContent>
