@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
-import { insertUserSchema, insertClassSchema, insertRegistrationSchema } from "@shared/schema";
+import { insertUserSchema, insertClassSchema, insertRegistrationSchema, insertDiscountCodeSchema } from "@shared/schema";
 
 // Use testing keys in development, live keys in production
 const stripeSecretKey = process.env.NODE_ENV === 'development' 
@@ -277,6 +277,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Delete registration error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Discount Code routes
+  app.get("/api/discount-codes", async (req, res) => {
+    try {
+      const discountCodes = await storage.getDiscountCodes();
+      res.json({ success: true, discountCodes });
+    } catch (error) {
+      console.error("Get discount codes error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/discount-codes", async (req, res) => {
+    try {
+      const discountCodeData = insertDiscountCodeSchema.parse(req.body);
+      const discountCode = await storage.createDiscountCode(discountCodeData);
+      
+      res.status(201).json({ 
+        success: true, 
+        discountCode,
+        message: "Discount code created successfully"
+      });
+    } catch (error) {
+      console.error("Create discount code error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid discount code data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/validate-discount-code", async (req, res) => {
+    try {
+      const { code } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ error: "Discount code is required" });
+      }
+      
+      const validation = await storage.validateDiscountCode(code);
+      
+      if (validation.valid) {
+        res.json({ 
+          success: true, 
+          valid: true,
+          discountCode: validation.discountCode 
+        });
+      } else {
+        res.json({ 
+          success: true, 
+          valid: false,
+          reason: validation.reason 
+        });
+      }
+    } catch (error) {
+      console.error("Validate discount code error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/discount-codes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertDiscountCodeSchema.partial().parse(req.body);
+      
+      const updatedDiscountCode = await storage.updateDiscountCode(id, updates);
+      
+      if (!updatedDiscountCode) {
+        return res.status(404).json({ error: "Discount code not found" });
+      }
+
+      res.json({ 
+        success: true, 
+        discountCode: updatedDiscountCode,
+        message: "Discount code updated successfully"
+      });
+    } catch (error) {
+      console.error("Update discount code error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid discount code data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/discount-codes/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteDiscountCode(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Discount code not found" });
+      }
+
+      res.json({ 
+        success: true,
+        message: "Discount code deleted successfully"
+      });
+    } catch (error) {
+      console.error("Delete discount code error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

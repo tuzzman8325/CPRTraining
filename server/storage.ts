@@ -1,8 +1,8 @@
-import { type User, type InsertUser, type Class, type InsertClass, type Registration, type InsertRegistration } from "@shared/schema";
+import { type User, type InsertUser, type Class, type InsertClass, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, classes, registrations } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { users, classes, registrations, discountCodes } from "@shared/schema";
+import { eq, sql, and, lt } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
 // you might need
@@ -26,17 +26,36 @@ export interface IStorage {
   createRegistration(registration: InsertRegistration): Promise<Registration>;
   updateRegistration(id: string, updates: Partial<InsertRegistration>): Promise<Registration | undefined>;
   deleteRegistration(id: string): Promise<boolean>;
+  
+  // Discount Code CRUD operations
+  getDiscountCodes(): Promise<DiscountCode[]>;
+  getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined>;
+  createDiscountCode(discountCode: InsertDiscountCode): Promise<DiscountCode>;
+  updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined>;
+  deleteDiscountCode(id: string): Promise<boolean>;
+  validateDiscountCode(code: string): Promise<{ valid: boolean; discountCode?: DiscountCode; reason?: string }>;
+  useDiscountCode(code: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private classes: Map<string, Class>;
   private registrations: Map<string, Registration>;
+  private discountCodes: Map<string, DiscountCode>;
 
   constructor() {
     this.users = new Map();
     this.classes = new Map();
     this.registrations = new Map();
+    this.discountCodes = new Map();
+  }
+
+  // Helper function to generate random discount code in ABCD-EFGH format
+  private generateDiscountCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const part1 = Array.from({length: 4}, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+    const part2 = Array.from({length: 4}, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+    return `${part1}-${part2}`;
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -113,10 +132,12 @@ export class MemStorage implements IStorage {
     const registration: Registration = { 
       ...insertRegistration, 
       id,
+      userId: insertRegistration.userId || null,
       status: insertRegistration.status || "pending",
       paymentIntentId: insertRegistration.paymentIntentId || null,
       amountPaid: insertRegistration.amountPaid || null,
       phone: insertRegistration.phone || null,
+      discountCodeId: insertRegistration.discountCodeId || null,
       registrationDate: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
     };
     this.registrations.set(id, registration);
@@ -153,6 +174,77 @@ export class MemStorage implements IStorage {
       }
     }
     return this.registrations.delete(id);
+  }
+
+  // Discount Code CRUD operations
+  async getDiscountCodes(): Promise<DiscountCode[]> {
+    return Array.from(this.discountCodes.values());
+  }
+
+  async getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined> {
+    return Array.from(this.discountCodes.values()).find(dc => dc.code === code);
+  }
+
+  async createDiscountCode(insertDiscountCode: InsertDiscountCode): Promise<DiscountCode> {
+    const id = randomUUID();
+    const code = insertDiscountCode.code || this.generateDiscountCode();
+    const discountCode: DiscountCode = {
+      ...insertDiscountCode,
+      id,
+      code,
+      expiresAt: new Date(insertDiscountCode.expiresAt),
+      isActive: insertDiscountCode.isActive ?? true,
+      usedCount: 0,
+      maxUses: insertDiscountCode.maxUses || null,
+      createdAt: new Date(),
+      description: insertDiscountCode.description || null
+    };
+    this.discountCodes.set(id, discountCode);
+    return discountCode;
+  }
+
+  async updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined> {
+    const existing = this.discountCodes.get(id);
+    if (!existing) return undefined;
+    
+    const updated: DiscountCode = { ...existing, ...updates };
+    this.discountCodes.set(id, updated);
+    return updated;
+  }
+
+  async deleteDiscountCode(id: string): Promise<boolean> {
+    return this.discountCodes.delete(id);
+  }
+
+  async validateDiscountCode(code: string): Promise<{ valid: boolean; discountCode?: DiscountCode; reason?: string }> {
+    const discountCode = await this.getDiscountCodeByCode(code);
+    
+    if (!discountCode) {
+      return { valid: false, reason: "Invalid discount code" };
+    }
+
+    if (!discountCode.isActive) {
+      return { valid: false, reason: "This discount code has been deactivated" };
+    }
+
+    if (new Date() > new Date(discountCode.expiresAt)) {
+      return { valid: false, reason: "This discount code has expired" };
+    }
+
+    if (discountCode.maxUses && discountCode.usedCount >= discountCode.maxUses) {
+      return { valid: false, reason: "This discount code has reached its usage limit" };
+    }
+
+    return { valid: true, discountCode };
+  }
+
+  async useDiscountCode(code: string): Promise<boolean> {
+    const validation = await this.validateDiscountCode(code);
+    if (!validation.valid || !validation.discountCode) return false;
+
+    const updated = { ...validation.discountCode, usedCount: validation.discountCode.usedCount + 1 };
+    this.discountCodes.set(validation.discountCode.id, updated);
+    return true;
   }
 }
 
@@ -194,7 +286,7 @@ export class DbStorage implements IStorage {
 
   async deleteClass(id: string): Promise<boolean> {
     const result = await db.delete(classes).where(eq(classes.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Registration CRUD operations
@@ -234,7 +326,81 @@ export class DbStorage implements IStorage {
     }
     
     const result = await db.delete(registrations).where(eq(registrations.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Helper function to generate random discount code in ABCD-EFGH format
+  private generateDiscountCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const part1 = Array.from({length: 4}, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+    const part2 = Array.from({length: 4}, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+    return `${part1}-${part2}`;
+  }
+
+  // Discount Code CRUD operations
+  async getDiscountCodes(): Promise<DiscountCode[]> {
+    return await db.select().from(discountCodes);
+  }
+
+  async getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined> {
+    const result = await db.select().from(discountCodes).where(eq(discountCodes.code, code));
+    return result[0];
+  }
+
+  async createDiscountCode(insertDiscountCode: InsertDiscountCode): Promise<DiscountCode> {
+    const codeValue = insertDiscountCode.code || this.generateDiscountCode();
+    const result = await db.insert(discountCodes).values({
+      ...insertDiscountCode,
+      code: codeValue,
+      expiresAt: new Date(insertDiscountCode.expiresAt),
+    }).returning();
+    return result[0];
+  }
+
+  async updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined> {
+    const updateData: any = { ...updates };
+    if (updateData.expiresAt) {
+      updateData.expiresAt = new Date(updateData.expiresAt);
+    }
+    const result = await db.update(discountCodes).set(updateData).where(eq(discountCodes.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteDiscountCode(id: string): Promise<boolean> {
+    const result = await db.delete(discountCodes).where(eq(discountCodes.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async validateDiscountCode(code: string): Promise<{ valid: boolean; discountCode?: DiscountCode; reason?: string }> {
+    const discountCode = await this.getDiscountCodeByCode(code);
+    
+    if (!discountCode) {
+      return { valid: false, reason: "Invalid discount code" };
+    }
+
+    if (!discountCode.isActive) {
+      return { valid: false, reason: "This discount code has been deactivated" };
+    }
+
+    if (new Date() > new Date(discountCode.expiresAt)) {
+      return { valid: false, reason: "This discount code has expired" };
+    }
+
+    if (discountCode.maxUses && discountCode.usedCount >= discountCode.maxUses) {
+      return { valid: false, reason: "This discount code has reached its usage limit" };
+    }
+
+    return { valid: true, discountCode };
+  }
+
+  async useDiscountCode(code: string): Promise<boolean> {
+    const validation = await this.validateDiscountCode(code);
+    if (!validation.valid || !validation.discountCode) return false;
+
+    await db.execute(
+      sql`UPDATE discount_codes SET used_count = used_count + 1 WHERE code = ${code}`
+    );
+    return true;
   }
 }
 
