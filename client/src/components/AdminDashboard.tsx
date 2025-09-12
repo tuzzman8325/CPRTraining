@@ -47,6 +47,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Class, InsertClass, insertClassSchema } from '@shared/schema';
+import { z } from 'zod';
 
 // API Response types
 interface ClassesResponse {
@@ -197,9 +198,9 @@ export default function AdminDashboard() {
         },
         { message: "Date must be in the future" }
       ),
-      capacity: insertClassSchema.shape.capacity.min(1, "Capacity must be at least 1"),
-      available: insertClassSchema.shape.available.min(0, "Available spots cannot be negative"),
-      price: insertClassSchema.shape.price.min(0, "Price cannot be negative")
+      capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
+      available: z.coerce.number().min(0, "Available spots cannot be negative"),
+      price: z.coerce.number().min(0, "Price cannot be negative")
     })),
     defaultValues: {
       title: '',
@@ -225,9 +226,9 @@ export default function AdminDashboard() {
         },
         { message: "Date must be in the future" }
       ),
-      capacity: insertClassSchema.shape.capacity.min(1, "Capacity must be at least 1"),
-      available: insertClassSchema.shape.available.min(0, "Available spots cannot be negative"),
-      price: insertClassSchema.shape.price.min(0, "Price cannot be negative")
+      capacity: z.coerce.number().min(1, "Capacity must be at least 1"),
+      available: z.coerce.number().min(0, "Available spots cannot be negative"),
+      price: z.coerce.number().min(0, "Price cannot be negative")
     })),
   });
 
