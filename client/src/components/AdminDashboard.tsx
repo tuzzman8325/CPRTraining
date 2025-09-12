@@ -41,7 +41,8 @@ import {
 
 interface Client {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   username: string;
@@ -54,7 +55,8 @@ interface Client {
 const mockClients: Client[] = [
   {
     id: '1',
-    name: 'John Smith',
+    firstName: 'John',
+    lastName: 'Smith',
     email: 'john.smith@email.com',
     phone: '(555) 123-4567',
     username: 'jsmith',
@@ -64,7 +66,8 @@ const mockClients: Client[] = [
   },
   {
     id: '2',
-    name: 'Sarah Johnson',
+    firstName: 'Sarah',
+    lastName: 'Johnson',
     email: 'sarah.johnson@email.com',
     phone: '(555) 234-5678',
     username: 'sjohnson',
@@ -74,7 +77,8 @@ const mockClients: Client[] = [
   },
   {
     id: '3',
-    name: 'Mike Wilson',
+    firstName: 'Mike',
+    lastName: 'Wilson',
     email: 'mike.wilson@email.com',
     phone: '(555) 345-6789',
     username: 'mwilson',
@@ -91,7 +95,9 @@ export default function AdminDashboard() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -99,7 +105,7 @@ export default function AdminDashboard() {
   const handleEdit = (client: Client) => {
     setSelectedClient(client);
     setIsEditDialogOpen(true);
-    console.log('Edit client:', client.name);
+    console.log('Edit client:', `${client.firstName} ${client.lastName}`);
   };
 
   const handleDelete = (clientId: string) => {
@@ -220,7 +226,7 @@ export default function AdminDashboard() {
                 <TableBody>
                   {filteredClients.map((client) => (
                     <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
-                      <TableCell className="font-medium">{client.name}</TableCell>
+                      <TableCell className="font-medium">{client.firstName} {client.lastName}</TableCell>
                       <TableCell>{client.username}</TableCell>
                       <TableCell>{client.email}</TableCell>
                       <TableCell>{client.phone}</TableCell>
@@ -281,12 +287,21 @@ export default function AdminDashboard() {
             {selectedClient && (
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-name" className="text-right">Name</Label>
+                  <Label htmlFor="edit-firstName" className="text-right">First Name</Label>
                   <Input 
-                    id="edit-name" 
-                    value={selectedClient.name} 
+                    id="edit-firstName" 
+                    value={selectedClient.firstName} 
                     className="col-span-3"
-                    data-testid="input-edit-name"
+                    data-testid="input-edit-firstName"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-lastName" className="text-right">Last Name</Label>
+                  <Input 
+                    id="edit-lastName" 
+                    value={selectedClient.lastName} 
+                    className="col-span-3"
+                    data-testid="input-edit-lastName"
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
