@@ -196,19 +196,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/registrations", async (req, res) => {
     try {
+      console.log("Creating registration with data:", req.body);
       const registrationData = insertRegistrationSchema.parse(req.body);
+      console.log("Parsed registration data:", registrationData);
       
       // Check if class exists and has availability
       const classData = await storage.getClassById(registrationData.classId);
       if (!classData) {
+        console.log("Class not found:", registrationData.classId);
         return res.status(404).json({ error: "Class not found" });
       }
       
       if (classData.available <= 0) {
+        console.log("Class is full:", classData);
         return res.status(400).json({ error: "Class is full" });
       }
 
+      console.log("Creating registration...");
       const registration = await storage.createRegistration(registrationData);
+      console.log("Registration created:", registration);
       
       res.status(201).json({ 
         success: true, 

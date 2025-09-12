@@ -76,9 +76,10 @@ const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess,
         return;
       }
 
+      console.log('Payment intent status:', paymentIntent?.status);
       if (paymentIntent?.status === 'succeeded') {
-        // Create the registration record
-        await apiRequest('POST', '/api/registrations', {
+        console.log('Creating registration record...');
+        const registrationData = {
           classId: classData.id,
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -87,7 +88,24 @@ const RegistrationForm = ({ classData, clientSecret, paymentIntentId, onSuccess,
           paymentIntentId: paymentIntent.id,
           amountPaid: paymentIntent.amount,
           status: 'confirmed'
-        });
+        };
+        console.log('Registration data:', registrationData);
+        
+        try {
+          const registrationResponse = await apiRequest('POST', '/api/registrations', registrationData);
+          console.log('Registration response:', registrationResponse);
+          
+          if (!registrationResponse.ok) {
+            const errorData = await registrationResponse.json();
+            console.error('Registration failed:', errorData);
+            throw new Error(errorData.error || 'Registration failed');
+          }
+          
+          console.log('Registration successful!');
+        } catch (registrationError) {
+          console.error('Registration error:', registrationError);
+          throw registrationError;
+        }
 
         toast({
           title: "Registration Successful!",

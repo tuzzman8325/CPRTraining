@@ -27,7 +27,7 @@ export const classes = pgTable("classes", {
 
 export const registrations = pgTable("registrations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").references(() => users.id),
   classId: varchar("class_id").notNull().references(() => classes.id),
   status: registrationStatusEnum("status").notNull().default("pending"),
   paymentIntentId: text("payment_intent_id"), // Stripe payment intent ID
@@ -52,6 +52,8 @@ export const insertClassSchema = createInsertSchema(classes).omit({
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({
   id: true,
   registrationDate: true,
+}).partial({
+  userId: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
