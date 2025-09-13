@@ -219,6 +219,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Class is full" });
       }
 
+      // Create/Update Client Record
+      console.log("Processing client record...");
+      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const classDate = classData.date; // Class date for certification tracking
+      const courseType = classData.type; // BLS or Heartsaver
+      
+      // Check if client already exists by email
+      let client = await storage.getClientByEmail(registrationData.email);
+      
+      if (client) {
+        console.log("Updating existing client:", client.id);
+        // Update existing client - add course to completedCourses and update lastCourseDate
+        const updatedCompletedCourses = [...client.completedCourses];
+        if (!updatedCompletedCourses.includes(courseType)) {
+          updatedCompletedCourses.push(courseType);
+        }
+        
+        // Calculate certification status based on 2-year rule
+        const lastCourseDateObj = new Date(classDate);
+        const currentDateObj = new Date(currentDate);
+        const daysDiff = (currentDateObj.getTime() - lastCourseDateObj.getTime()) / (1000 * 3600 * 24);
+        const certificationStatus = daysDiff <= 730 ? "active" : "expired"; // 2 years = 730 days
+        
+        await storage.updateClient(client.id, {
+          phone: registrationData.phone || client.phone,
+          lastCourseDate: classDate,
+          completedCourses: updatedCompletedCourses,
+          certificationStatus: certificationStatus as "active" | "inactive" | "expired"
+        });
+        console.log("Client updated successfully");
+      } else {
+        console.log("Creating new client record");
+        // Create new client record
+        const newClientData = {
+          firstName: registrationData.firstName,
+          lastName: registrationData.lastName,
+          email: registrationData.email,
+          phone: registrationData.phone,
+          registrationDate: currentDate,
+          lastCourseDate: classDate,
+          completedCourses: [courseType],
+          certificationStatus: "active" as "active" | "inactive" | "expired"
+        };
+        
+        client = await storage.createClient(newClientData);
+        console.log("New client created:", client.id);
+      }
+
       console.log("Creating registration...");
       const registration = await storage.createRegistration(registrationData);
       console.log("Registration created:", registration);
@@ -226,6 +274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({ 
         success: true, 
         registration,
+        clientId: client.id,
         message: "Registration created successfully"
       });
     } catch (error) {
@@ -429,6 +478,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Use discount code error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Client Management routes (for testing and admin purposes)
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const clients = await storage.getClients();
+      res.json({ success: true, clients });
+    } catch (error) {
+      console.error("Get clients error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const client = await storage.getClientById(id);
+      
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      res.json({ success: true, client });
+    } catch (error) {
+      console.error("Get client error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/clients/email/:email", async (req, res) => {
+    try {
+      const { email } = req.params;
+      const client = await storage.getClientByEmail(decodeURIComponent(email));
+      
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      res.json({ success: true, client });
+    } catch (error) {
+      console.error("Get client by email error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
