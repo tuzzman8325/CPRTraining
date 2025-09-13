@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
-import { insertUserSchema, insertClassSchema, insertRegistrationSchema, insertDiscountCodeSchema } from "@shared/schema";
+import { insertUserSchema, insertClassSchema, insertRegistrationSchema, insertDiscountCodeSchema, insertClientSchema } from "@shared/schema";
 
 // Use testing keys in development, live keys in production
 const stripeSecretKey = process.env.NODE_ENV === 'development' 
@@ -521,6 +521,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, client });
     } catch (error) {
       console.error("Get client by email error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertClientSchema.partial().parse(req.body);
+      
+      const updatedClient = await storage.updateClient(id, updates);
+      
+      if (!updatedClient) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      res.json({ 
+        success: true, 
+        client: updatedClient,
+        message: "Client updated successfully"
+      });
+    } catch (error) {
+      console.error("Update client error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid client data", details: (error as any).errors });
+      }
       res.status(500).json({ error: "Internal server error" });
     }
   });
