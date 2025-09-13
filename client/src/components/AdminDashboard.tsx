@@ -112,7 +112,8 @@ import {
   Copy,
   ChevronDown,
   ChevronRight,
-  FileText
+  FileText,
+  Eye
 } from 'lucide-react';
 
 
@@ -133,6 +134,11 @@ export default function AdminDashboard() {
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [isAddClassDialogOpen, setIsAddClassDialogOpen] = useState(false);
   const [isEditClassDialogOpen, setIsEditClassDialogOpen] = useState(false);
+  const [isClassDetailsDialogOpen, setIsClassDetailsDialogOpen] = useState(false);
+  const [classDetailsData, setClassDetailsData] = useState<{
+    classData: Class;
+    registrations: Registration[];
+  } | null>(null);
 
   // Registration state
   const [registrationSearchTerm, setRegistrationSearchTerm] = useState('');
@@ -587,6 +593,31 @@ export default function AdminDashboard() {
     }
   };
 
+  // View class details function
+  const handleViewClassDetails = async (classItem: Class) => {
+    try {
+      const response = await fetch(`/api/classes/${classItem.id}/roster`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setClassDetailsData({
+          classData: data.classData,
+          registrations: data.registrations
+        });
+        setIsClassDetailsDialogOpen(true);
+      } else {
+        throw new Error(data.error || 'Failed to load class details');
+      }
+    } catch (error) {
+      console.error('Load class details error:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to load class details",
+        variant: "destructive" 
+      });
+    }
+  };
+
   // Roster generation function
   const handleGenerateRoster = async (classItem: Class) => {
     try {
@@ -974,6 +1005,13 @@ export default function AdminDashboard() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                  onClick={() => handleViewClassDetails(classItem)}
+                                  data-testid={`button-view-details-${classItem.id}`}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleEditClass(classItem)}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit
@@ -1288,6 +1326,240 @@ export default function AdminDashboard() {
             </CollapsibleContent>
           </Card>
         </Collapsible>
+
+        {/* Class Details Dialog */}
+        <Dialog open={isClassDetailsDialogOpen} onOpenChange={setIsClassDetailsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="dialog-class-details">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">
+                Class Details
+              </DialogTitle>
+              <DialogDescription>
+                View class information and enrolled students
+              </DialogDescription>
+            </DialogHeader>
+            
+            {classDetailsData && (
+              <div className="space-y-6">
+                {/* Class Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <BookOpen className="h-5 w-5" />
+                        Class Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Title:</span>
+                        <p className="font-medium">{classDetailsData.classData.title}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Type:</span>
+                        <Badge variant={classDetailsData.classData.type === 'BLS' ? 'default' : 'secondary'} className="ml-2">
+                          {classDetailsData.classData.type}
+                        </Badge>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Date:</span>
+                        <p className="font-medium">{new Date(classDetailsData.classData.date).toLocaleDateString('en-US', { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Time:</span>
+                        <p className="font-medium">{classDetailsData.classData.time}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Duration:</span>
+                        <p className="font-medium">{classDetailsData.classData.duration}</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Price:</span>
+                        <p className="font-medium">${classDetailsData.classData.price}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Users className="h-5 w-5" />
+                        Enrollment Stats
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Capacity:</span>
+                        <p className="font-medium">{classDetailsData.classData.capacity} students</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Enrolled:</span>
+                        <p className="font-medium">{classDetailsData.registrations.length} students</p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Available:</span>
+                        <Badge variant={classDetailsData.classData.available > 0 ? 'default' : 'destructive'}>
+                          {classDetailsData.classData.available} remaining
+                        </Badge>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Paid Registrations:</span>
+                        <p className="font-medium">
+                          {classDetailsData.registrations.filter(r => r.paymentIntentId).length} students
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Discount Codes Used:</span>
+                        <p className="font-medium">
+                          {classDetailsData.registrations.filter(r => r.discountCode).length} students
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Total Revenue:</span>
+                        <p className="font-medium">
+                          ${(classDetailsData.registrations.reduce((sum, r) => sum + (r.amountPaid || 0), 0) / 100).toFixed(2)}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Enrolled Students */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5" />
+                      Enrolled Students ({classDetailsData.registrations.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {classDetailsData.registrations.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No students enrolled yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Mobile Layout */}
+                        <div className="md:hidden space-y-3">
+                          {classDetailsData.registrations.map((registration, index) => (
+                            <Card key={registration.id} className="p-4">
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <p className="font-medium" data-testid={`text-student-name-${index}`}>
+                                      {registration.firstName} {registration.lastName}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">{registration.email}</p>
+                                    {registration.phone && (
+                                      <p className="text-sm text-muted-foreground">{registration.phone}</p>
+                                    )}
+                                  </div>
+                                  <Badge variant="secondary" className="text-xs">
+                                    #{index + 1}
+                                  </Badge>
+                                </div>
+                                <div className="pt-2 border-t">
+                                  <div className="flex flex-col gap-1 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Payment:</span>
+                                      <span className="font-medium">
+                                        {registration.discountCode 
+                                          ? `Code: ${registration.discountCode.code}`
+                                          : registration.paymentIntentId 
+                                            ? `$${((registration.amountPaid || 0) / 100).toFixed(2)}`
+                                            : 'Pending'
+                                        }
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Status:</span>
+                                      <Badge 
+                                        variant={
+                                          registration.paymentIntentId || registration.discountCode 
+                                            ? 'default' 
+                                            : 'secondary'
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {registration.paymentIntentId || registration.discountCode ? 'Confirmed' : 'Pending'}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+
+                        {/* Desktop Table Layout */}
+                        <div className="hidden md:block">
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>#</TableHead>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Email</TableHead>
+                                  <TableHead>Phone</TableHead>
+                                  <TableHead>Payment Method</TableHead>
+                                  <TableHead>Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {classDetailsData.registrations.map((registration, index) => (
+                                  <TableRow key={registration.id} data-testid={`row-student-${index}`}>
+                                    <TableCell className="font-medium">#{index + 1}</TableCell>
+                                    <TableCell className="font-medium">
+                                      {registration.firstName} {registration.lastName}
+                                    </TableCell>
+                                    <TableCell>{registration.email}</TableCell>
+                                    <TableCell>{registration.phone || 'N/A'}</TableCell>
+                                    <TableCell>
+                                      {registration.discountCode ? (
+                                        <div className="flex items-center gap-2">
+                                          <Ticket className="h-4 w-4" />
+                                          <span>Code: {registration.discountCode.code}</span>
+                                        </div>
+                                      ) : registration.paymentIntentId ? (
+                                        <div className="flex items-center gap-2">
+                                          <DollarSign className="h-4 w-4" />
+                                          <span>${((registration.amountPaid || 0) / 100).toFixed(2)}</span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-muted-foreground">Pending Payment</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge 
+                                        variant={
+                                          registration.paymentIntentId || registration.discountCode 
+                                            ? 'default' 
+                                            : 'secondary'
+                                        }
+                                      >
+                                        {registration.paymentIntentId || registration.discountCode ? 'Confirmed' : 'Pending'}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Client Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
