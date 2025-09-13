@@ -545,16 +545,19 @@ export default function AdminDashboard() {
 
   // Client handlers
   const handleEdit = (client: Client) => {
-    setSelectedClient(client);
+    // Always find the latest client data from the current clients list
+    // to ensure we have the most up-to-date information
+    const latestClient = clients.find(c => c.id === client.id) || client;
+    setSelectedClient(latestClient);
     editClientForm.reset({
-      firstName: client.firstName,
-      lastName: client.lastName,
-      email: client.email,
-      phone: client.phone,
-      registrationDate: client.registrationDate,
-      lastCourseDate: client.lastCourseDate,
-      completedCourses: client.completedCourses,
-      certificationStatus: client.certificationStatus
+      firstName: latestClient.firstName,
+      lastName: latestClient.lastName,
+      email: latestClient.email,
+      phone: latestClient.phone,
+      registrationDate: latestClient.registrationDate,
+      lastCourseDate: latestClient.lastCourseDate,
+      completedCourses: latestClient.completedCourses,
+      certificationStatus: latestClient.certificationStatus
     });
     setIsEditDialogOpen(true);
   };
@@ -2004,7 +2007,7 @@ export default function AdminDashboard() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Certification Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-edit-certificationStatus">
                               <SelectValue />
@@ -2243,7 +2246,7 @@ export default function AdminDashboard() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-edit-type">
                               <SelectValue />
