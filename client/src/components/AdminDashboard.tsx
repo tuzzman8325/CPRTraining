@@ -608,20 +608,6 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-bold">Admin Dashboard</h1>
             <p className="text-muted-foreground">Manage your CPR training clients, classes and records</p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={handleAddClient} data-testid="button-add-client">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Client
-            </Button>
-            <Button onClick={handleAddClass} data-testid="button-add-class">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Class
-            </Button>
-            <Button onClick={handleAddDiscountCode} data-testid="button-add-discount-code">
-              <Ticket className="h-4 w-4 mr-2" />
-              Add Discount Code
-            </Button>
-          </div>
         </div>
 
         {/* Stats Cards */}
@@ -720,7 +706,20 @@ export default function AdminDashboard() {
                     </CardTitle>
                     <CardDescription>View and manage all registered clients</CardDescription>
                   </div>
-                  {openSection === 'clients' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddClient();
+                      }} 
+                      size="sm"
+                      data-testid="button-add-client"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Client
+                    </Button>
+                    {openSection === 'clients' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
                 </div>
               </CardHeader>
             </CollapsibleTrigger>
@@ -834,7 +833,20 @@ export default function AdminDashboard() {
                     </CardTitle>
                     <CardDescription>View and manage all training classes</CardDescription>
                   </div>
-                  {openSection === 'classes' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddClass();
+                      }} 
+                      size="sm"
+                      data-testid="button-add-class"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Class
+                    </Button>
+                    {openSection === 'classes' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
                 </div>
               </CardHeader>
             </CollapsibleTrigger>
@@ -1072,7 +1084,20 @@ export default function AdminDashboard() {
                     </CardTitle>
                     <CardDescription>Create and manage discount codes for free class registrations</CardDescription>
                   </div>
-                  {openSection === 'discount-codes' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddDiscountCode();
+                      }} 
+                      size="sm"
+                      data-testid="button-add-discount-code"
+                    >
+                      <Ticket className="h-4 w-4 mr-2" />
+                      Add Discount Code
+                    </Button>
+                    {openSection === 'discount-codes' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
                 </div>
               </CardHeader>
             </CollapsibleTrigger>
