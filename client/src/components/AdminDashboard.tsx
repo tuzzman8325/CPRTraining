@@ -426,8 +426,7 @@ export default function AdminDashboard() {
       phone: '',
       registrationDate: '',
       lastCourseDate: '',
-      completedCourses: [],
-      certificationStatus: 'active'
+      completedCourses: []
     }
   });
 
@@ -556,8 +555,7 @@ export default function AdminDashboard() {
       phone: latestClient.phone || '',
       registrationDate: latestClient.registrationDate,
       lastCourseDate: latestClient.lastCourseDate || '',
-      completedCourses: latestClient.completedCourses,
-      certificationStatus: latestClient.certificationStatus
+      completedCourses: latestClient.completedCourses
     });
     setIsEditDialogOpen(true);
   };
@@ -2001,28 +1999,6 @@ export default function AdminDashboard() {
                     )}
                   />
                   
-                  <FormField
-                    control={editClientForm.control}
-                    name="certificationStatus"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Certification Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-edit-certificationStatus">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   
                   <DialogFooter>
                     <Button 
@@ -2775,28 +2751,6 @@ export default function AdminDashboard() {
                   )}
                 />
                 
-                <FormField
-                  control={addClientForm.control}
-                  name="certificationStatus"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Certification Status</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-add-certificationStatus">
-                            <SelectValue placeholder="Select certification status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                          <SelectItem value="expired">Expired</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 
                 <DialogFooter>
                   <Button 
