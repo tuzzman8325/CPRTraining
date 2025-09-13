@@ -19,6 +19,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Class } from '@shared/schema';
+import { parseLocalDate } from '@/lib/utils';
 import blsImage from '@assets/generated_images/BLS_provider_training_a0cd6457.png';
 import heartsaverImage from '@assets/generated_images/Heartsaver_community_training_b3867bec.png';
 
@@ -47,10 +48,10 @@ export default function Classes() {
       
       const upcoming = courseClasses
         .filter(cls => {
-          const classDate = new Date(cls.date);
+          const classDate = parseLocalDate(cls.date);
           return classDate >= today;
         })
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
       
       return upcoming[0] || null;
     };
@@ -63,7 +64,7 @@ export default function Classes() {
 
     // Helper function to format date
     const formatDate = (dateStr: string) => {
-      const date = new Date(dateStr);
+      const date = parseLocalDate(dateStr);
       return date.toLocaleDateString('en-US', { 
         weekday: 'long',
         year: 'numeric', 

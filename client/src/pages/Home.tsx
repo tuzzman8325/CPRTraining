@@ -10,6 +10,7 @@ import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Class } from '@shared/schema';
 import { format } from 'date-fns';
+import { parseLocalDate } from '@/lib/utils';
 import blsImage from '@assets/generated_images/BLS_provider_training_a0cd6457.png';
 import heartsaverImage from '@assets/generated_images/Heartsaver_community_training_b3867bec.png';
 
@@ -30,10 +31,10 @@ export default function Home() {
     const typeClasses = classes
       .filter(c => c.type === type)
       .filter(c => {
-        const classDate = new Date(c.date);
+        const classDate = parseLocalDate(c.date);
         return classDate >= today;
       })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
     
     return typeClasses[0] || null;
   };
@@ -104,7 +105,7 @@ export default function Home() {
                       duration={nextBLSClass.duration}
                       capacity={nextBLSClass.capacity}
                       price={nextBLSClass.price}
-                      nextDate={`${format(new Date(nextBLSClass.date), 'MMMM d, yyyy')} at ${nextBLSClass.time}`}
+                      nextDate={`${format(parseLocalDate(nextBLSClass.date), 'MMMM d, yyyy')} at ${nextBLSClass.time}`}
                       image={blsImage}
                       type="BLS"
                       onRegister={() => handleClassRegister('BLS')}
@@ -133,7 +134,7 @@ export default function Home() {
                       duration={nextHeartsaverClass.duration}
                       capacity={nextHeartsaverClass.capacity}
                       price={nextHeartsaverClass.price}
-                      nextDate={`${format(new Date(nextHeartsaverClass.date), 'MMMM d, yyyy')} at ${nextHeartsaverClass.time}`}
+                      nextDate={`${format(parseLocalDate(nextHeartsaverClass.date), 'MMMM d, yyyy')} at ${nextHeartsaverClass.time}`}
                       image={heartsaverImage}
                       type="Heartsaver"
                       onRegister={() => handleClassRegister('Heartsaver')}
