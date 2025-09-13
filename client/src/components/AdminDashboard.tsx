@@ -226,8 +226,33 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/classes'] });
       toast({ title: "Success", description: "Class deleted successfully" });
     },
-    onError: (error) => {
-      toast({ title: "Error", description: `Failed to delete class: ${error.message}`, variant: "destructive" });
+    onError: (error: any) => {
+      let errorMessage = "Failed to delete class";
+      
+      // Handle specific constraint errors from the backend
+      if (error.response?.status === 409) {
+        // Conflict status indicates constraint violation
+        const errorData = error.response.data;
+        if (errorData.registrationCount) {
+          errorMessage = `Cannot delete class - ${errorData.registrationCount} student${errorData.registrationCount > 1 ? 's are' : ' is'} registered. Please cancel all registrations first.`;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else {
+          errorMessage = "Cannot delete class due to existing registrations. Please cancel all registrations first.";
+        }
+      } else if (error.response?.data?.error) {
+        // Use specific error message from backend
+        errorMessage = error.response.data.error;
+      } else {
+        // Fallback to generic error message
+        errorMessage = `Failed to delete class: ${error.message}`;
+      }
+      
+      toast({ 
+        title: "Cannot Delete Class", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     }
   });
   
@@ -638,8 +663,7 @@ export default function AdminDashboard() {
       expiresAt: new Date(discountCode.expiresAt).toISOString().split('T')[0],
       isActive: discountCode.isActive,
       maxUses: discountCode.maxUses,
-      description: discountCode.description || '',
-      createdBy: discountCode.createdBy
+      description: discountCode.description || ''
     });
     setIsEditDiscountCodeDialogOpen(true);
   };
@@ -1707,7 +1731,7 @@ export default function AdminDashboard() {
                       <div>
                         <span className="text-sm font-medium text-muted-foreground">Discount Codes Used:</span>
                         <p className="font-medium">
-                          {classDetailsData.registrations.filter(r => r.discountCode).length} students
+                          {classDetailsData.registrations.filter(r => r.discountCodeId).length} students
                         </p>
                       </div>
                       <div>
@@ -1760,8 +1784,8 @@ export default function AdminDashboard() {
                                     <div className="flex justify-between">
                                       <span className="text-muted-foreground">Payment:</span>
                                       <span className="font-medium">
-                                        {registration.discountCode 
-                                          ? `Code: ${registration.discountCode.code}`
+                                        {registration.discountCodeId 
+                                          ? `Discount Applied`
                                           : registration.paymentIntentId 
                                             ? `$${((registration.amountPaid || 0) / 100).toFixed(2)}`
                                             : 'Pending'
@@ -1772,13 +1796,13 @@ export default function AdminDashboard() {
                                       <span className="text-muted-foreground">Status:</span>
                                       <Badge 
                                         variant={
-                                          registration.paymentIntentId || registration.discountCode 
+                                          registration.paymentIntentId || registration.discountCodeId 
                                             ? 'default' 
                                             : 'secondary'
                                         }
                                         className="text-xs"
                                       >
-                                        {registration.paymentIntentId || registration.discountCode ? 'Confirmed' : 'Pending'}
+                                        {registration.paymentIntentId || registration.discountCodeId ? 'Confirmed' : 'Pending'}
                                       </Badge>
                                     </div>
                                   </div>
@@ -1812,10 +1836,10 @@ export default function AdminDashboard() {
                                     <TableCell>{registration.email}</TableCell>
                                     <TableCell>{registration.phone || 'N/A'}</TableCell>
                                     <TableCell>
-                                      {registration.discountCode ? (
+                                      {registration.discountCodeId ? (
                                         <div className="flex items-center gap-2">
                                           <Ticket className="h-4 w-4" />
-                                          <span>Code: {registration.discountCode.code}</span>
+                                          <span>Discount Applied</span>
                                         </div>
                                       ) : registration.paymentIntentId ? (
                                         <div className="flex items-center gap-2">
@@ -1829,12 +1853,12 @@ export default function AdminDashboard() {
                                     <TableCell>
                                       <Badge 
                                         variant={
-                                          registration.paymentIntentId || registration.discountCode 
+                                          registration.paymentIntentId || registration.discountCodeId 
                                             ? 'default' 
                                             : 'secondary'
                                         }
                                       >
-                                        {registration.paymentIntentId || registration.discountCode ? 'Confirmed' : 'Pending'}
+                                        {registration.paymentIntentId || registration.discountCodeId ? 'Confirmed' : 'Pending'}
                                       </Badge>
                                     </TableCell>
                                   </TableRow>
@@ -1916,7 +1940,7 @@ export default function AdminDashboard() {
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <Input {...field} type="tel" data-testid="input-edit-phone" />
+                          <Input {...field} value={field.value || ''} type="tel" data-testid="input-edit-phone" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2393,6 +2417,7 @@ export default function AdminDashboard() {
                         <Input 
                           placeholder="e.g., Promotional code for January" 
                           {...field} 
+                          value={field.value || ''}
                           data-testid="input-add-discount-description"
                         />
                       </FormControl>
@@ -2510,6 +2535,7 @@ export default function AdminDashboard() {
                           <Input 
                             placeholder="e.g., Promotional code for January" 
                             {...field} 
+                            value={field.value || ''}
                             data-testid="input-edit-discount-description"
                           />
                         </FormControl>
@@ -2668,7 +2694,7 @@ export default function AdminDashboard() {
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <Input {...field} type="tel" placeholder="(555) 123-4567" data-testid="input-add-phone" />
+                        <Input {...field} value={field.value || ''} type="tel" placeholder="(555) 123-4567" data-testid="input-add-phone" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

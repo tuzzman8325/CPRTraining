@@ -17,7 +17,7 @@ export interface IStorage {
   getClassById(id: string): Promise<Class | undefined>;
   createClass(classData: InsertClass): Promise<Class>;
   updateClass(id: string, updates: Partial<InsertClass>): Promise<Class | undefined>;
-  deleteClass(id: string): Promise<boolean>;
+  deleteClass(id: string): Promise<{ success: boolean; error?: string; registrationCount?: number }>;
   
   // Registration CRUD operations
   getRegistrations(): Promise<Registration[]>;
@@ -118,8 +118,20 @@ export class MemStorage implements IStorage {
     return updatedClass;
   }
 
-  async deleteClass(id: string): Promise<boolean> {
-    return this.classes.delete(id);
+  async deleteClass(id: string): Promise<{ success: boolean; error?: string; registrationCount?: number }> {
+    // Check for existing registrations first
+    const registrations = await this.getRegistrationsByClass(id);
+    
+    if (registrations.length > 0) {
+      return {
+        success: false,
+        error: `Cannot delete class - ${registrations.length} student${registrations.length > 1 ? 's are' : ' is'} registered. Please cancel all registrations first.`,
+        registrationCount: registrations.length
+      };
+    }
+    
+    const deleted = this.classes.delete(id);
+    return { success: deleted };
   }
 
   // Registration CRUD operations
@@ -225,7 +237,12 @@ export class MemStorage implements IStorage {
       processedUpdates.expiresAt = new Date(processedUpdates.expiresAt) as any;
     }
     
-    const updated: DiscountCode = { ...existing, ...processedUpdates };
+    const updated: DiscountCode = { 
+      ...existing, 
+      ...processedUpdates,
+      // Ensure expiresAt is always a Date object
+      expiresAt: processedUpdates.expiresAt ? new Date(processedUpdates.expiresAt) : existing.expiresAt
+    };
     this.discountCodes.set(id, updated);
     return updated;
   }
@@ -402,9 +419,31 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async deleteClass(id: string): Promise<boolean> {
-    const result = await db.delete(classes).where(eq(classes.id, id));
-    return (result.rowCount ?? 0) > 0;
+  async deleteClass(id: string): Promise<{ success: boolean; error?: string; registrationCount?: number }> {
+    try {
+      // Check for existing registrations first
+      const registrations = await this.getRegistrationsByClass(id);
+      
+      if (registrations.length > 0) {
+        return {
+          success: false,
+          error: `Cannot delete class - ${registrations.length} student${registrations.length > 1 ? 's are' : ' is'} registered. Please cancel all registrations first.`,
+          registrationCount: registrations.length
+        };
+      }
+      
+      const result = await db.delete(classes).where(eq(classes.id, id));
+      return { success: (result.rowCount ?? 0) > 0 };
+    } catch (error) {
+      // Handle potential foreign key constraint errors
+      if (error instanceof Error && error.message.includes('foreign key constraint')) {
+        return {
+          success: false,
+          error: "Cannot delete class due to existing registrations. Please cancel all registrations first."
+        };
+      }
+      throw error; // Re-throw other errors
+    }
   }
 
   // Registration CRUD operations

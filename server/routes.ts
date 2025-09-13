@@ -152,9 +152,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/classes/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const deleted = await storage.deleteClass(id);
+      const result = await storage.deleteClass(id);
       
-      if (!deleted) {
+      if (!result.success) {
+        if (result.error) {
+          // Return specific constraint error with appropriate status code
+          const statusCode = result.registrationCount && result.registrationCount > 0 ? 409 : 404;
+          return res.status(statusCode).json({ 
+            error: result.error,
+            registrationCount: result.registrationCount 
+          });
+        }
         return res.status(404).json({ error: "Class not found" });
       }
 
@@ -164,6 +172,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Delete class error:", error);
+      // Handle any uncaught foreign key constraint errors
+      if (error instanceof Error && error.message.includes('foreign key constraint')) {
+        return res.status(409).json({ 
+          error: "Cannot delete class due to existing registrations. Please cancel all registrations first." 
+        });
+      }
       res.status(500).json({ error: "Internal server error" });
     }
   });
