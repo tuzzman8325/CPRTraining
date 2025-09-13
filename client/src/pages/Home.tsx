@@ -24,9 +24,15 @@ export default function Home() {
   // Process classes to find next upcoming class for each type
   const getNextClass = (type: 'BLS' | 'Heartsaver') => {
     const today = new Date();
+    // Set to start of day to properly compare with class dates
+    today.setHours(0, 0, 0, 0);
+    
     const typeClasses = classes
       .filter(c => c.type === type)
-      .filter(c => new Date(c.date) >= today)
+      .filter(c => {
+        const classDate = new Date(c.date);
+        return classDate >= today;
+      })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     return typeClasses[0] || null;

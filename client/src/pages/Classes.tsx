@@ -42,9 +42,16 @@ export default function Classes() {
     // Helper function to get next upcoming class
     const getNextClass = (courseClasses: Class[]) => {
       const today = new Date();
+      // Set to start of day to properly compare with class dates
+      today.setHours(0, 0, 0, 0);
+      
       const upcoming = courseClasses
-        .filter(cls => new Date(cls.date) >= today)
+        .filter(cls => {
+          const classDate = new Date(cls.date);
+          return classDate >= today;
+        })
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
       return upcoming[0] || null;
     };
 
