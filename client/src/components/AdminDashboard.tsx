@@ -1963,7 +1963,7 @@ export default function AdminDashboard() {
                             <input
                               type="checkbox"
                               id="course-bls"
-                              checked={field.value.includes('BLS')}
+                              checked={field.value?.includes('BLS') || false}
                               onChange={(e) => {
                                 const current = field.value || [];
                                 if (e.target.checked) {
@@ -1980,7 +1980,7 @@ export default function AdminDashboard() {
                             <input
                               type="checkbox"
                               id="course-heartsaver"
-                              checked={field.value.includes('Heartsaver')}
+                              checked={field.value?.includes('Heartsaver') || false}
                               onChange={(e) => {
                                 const current = field.value || [];
                                 if (e.target.checked) {
@@ -2715,7 +2715,7 @@ export default function AdminDashboard() {
                           <input
                             type="checkbox"
                             id="add-course-bls"
-                            checked={field.value.includes('BLS')}
+                            checked={field.value?.includes('BLS') || false}
                             onChange={(e) => {
                               const current = field.value || [];
                               if (e.target.checked) {
@@ -2732,7 +2732,7 @@ export default function AdminDashboard() {
                           <input
                             type="checkbox"
                             id="add-course-heartsaver"
-                            checked={field.value.includes('Heartsaver')}
+                            checked={field.value?.includes('Heartsaver') || false}
                             onChange={(e) => {
                               const current = field.value || [];
                               if (e.target.checked) {
