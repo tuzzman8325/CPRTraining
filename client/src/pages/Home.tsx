@@ -4,12 +4,37 @@ import ClassCard from '@/components/ClassCard';
 import InstructorProfile from '@/components/InstructorProfile';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, Calendar as CalendarIcon, BookOpen } from 'lucide-react';
 import { Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { Class } from '@shared/schema';
+import { format } from 'date-fns';
 import blsImage from '@assets/generated_images/BLS_provider_training_a0cd6457.png';
 import heartsaverImage from '@assets/generated_images/Heartsaver_community_training_b3867bec.png';
 
 export default function Home() {
+  // Fetch classes data
+  const { data: classesResponse, isLoading } = useQuery<{ success: boolean; classes: Class[] }>({
+    queryKey: ['/api/classes'],
+  });
+
+  const classes = classesResponse?.classes || [];
+
+  // Process classes to find next upcoming class for each type
+  const getNextClass = (type: 'BLS' | 'Heartsaver') => {
+    const today = new Date();
+    const typeClasses = classes
+      .filter(c => c.type === type)
+      .filter(c => new Date(c.date) >= today)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    return typeClasses[0] || null;
+  };
+
+  const nextBLSClass = getNextClass('BLS');
+  const nextHeartsaverClass = getNextClass('Heartsaver');
+
   const handleClassRegister = (type: string) => {
     console.log(`Register for ${type} class`);
     // TODO: Implement registration flow
@@ -19,6 +44,24 @@ export default function Home() {
     console.log(`Learn more about ${type} class`);
     // TODO: Navigate to class details
   };
+
+  // Loading state component
+  const ClassCardSkeleton = () => (
+    <div className="bg-card border border-border rounded-lg p-6">
+      <Skeleton className="h-48 w-full mb-4 rounded" />
+      <Skeleton className="h-6 w-3/4 mb-2" />
+      <Skeleton className="h-4 w-full mb-4" />
+      <div className="space-y-2 mb-4">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+      <div className="flex gap-2">
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-32" />
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -40,31 +83,72 @@ export default function Home() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
-              <ClassCard
-                title="BLS Provider"
-                description="Advanced life support training for healthcare professionals, first responders, and emergency medical personnel. Includes high-quality CPR, use of bag-mask device, and team-based resuscitation."
-                duration="4 hours"
-                capacity={12}
-                price={85}
-                nextDate="March 15, 2024"
-                image={blsImage}
-                type="BLS"
-                onRegister={() => handleClassRegister('BLS')}
-                onLearnMore={() => handleClassLearnMore('BLS')}
-              />
-              
-              <ClassCard
-                title="Heartsaver CPR"
-                description="Essential CPR and AED training for community members, teachers, coaches, and lay rescuers. Perfect for those who want to learn life-saving skills for family and community."
-                duration="3 hours"
-                capacity={16}
-                price={65}
-                nextDate="March 18, 2024"
-                image={heartsaverImage}
-                type="Heartsaver"
-                onRegister={() => handleClassRegister('Heartsaver')}
-                onLearnMore={() => handleClassLearnMore('Heartsaver')}
-              />
+              {isLoading ? (
+                <>
+                  <ClassCardSkeleton />
+                  <ClassCardSkeleton />
+                </>
+              ) : (
+                <>
+                  {/* BLS Class Card */}
+                  {nextBLSClass ? (
+                    <ClassCard
+                      title={nextBLSClass.title}
+                      description={`Advanced life support training for healthcare professionals, first responders, and emergency medical personnel. Includes high-quality CPR, use of bag-mask device, and team-based resuscitation. ${nextBLSClass.capacity - nextBLSClass.available} students enrolled, ${nextBLSClass.available} spots remaining.`}
+                      duration={nextBLSClass.duration}
+                      capacity={nextBLSClass.capacity}
+                      price={nextBLSClass.price}
+                      nextDate={`${format(new Date(nextBLSClass.date), 'MMMM d, yyyy')} at ${nextBLSClass.time}`}
+                      image={blsImage}
+                      type="BLS"
+                      onRegister={() => handleClassRegister('BLS')}
+                      onLearnMore={() => handleClassLearnMore('BLS')}
+                    />
+                  ) : (
+                    <ClassCard
+                      title="BLS Provider"
+                      description="Advanced life support training for healthcare professionals, first responders, and emergency medical personnel. Includes high-quality CPR, use of bag-mask device, and team-based resuscitation."
+                      duration="4 hours"
+                      capacity={12}
+                      price={85}
+                      nextDate="No upcoming classes scheduled"
+                      image={blsImage}
+                      type="BLS"
+                      onRegister={() => handleClassRegister('BLS')}
+                      onLearnMore={() => handleClassLearnMore('BLS')}
+                    />
+                  )}
+                  
+                  {/* Heartsaver Class Card */}
+                  {nextHeartsaverClass ? (
+                    <ClassCard
+                      title={nextHeartsaverClass.title}
+                      description={`Essential CPR and AED training for community members, teachers, coaches, and lay rescuers. Perfect for those who want to learn life-saving skills for family and community. ${nextHeartsaverClass.capacity - nextHeartsaverClass.available} students enrolled, ${nextHeartsaverClass.available} spots remaining.`}
+                      duration={nextHeartsaverClass.duration}
+                      capacity={nextHeartsaverClass.capacity}
+                      price={nextHeartsaverClass.price}
+                      nextDate={`${format(new Date(nextHeartsaverClass.date), 'MMMM d, yyyy')} at ${nextHeartsaverClass.time}`}
+                      image={heartsaverImage}
+                      type="Heartsaver"
+                      onRegister={() => handleClassRegister('Heartsaver')}
+                      onLearnMore={() => handleClassLearnMore('Heartsaver')}
+                    />
+                  ) : (
+                    <ClassCard
+                      title="Heartsaver CPR"
+                      description="Essential CPR and AED training for community members, teachers, coaches, and lay rescuers. Perfect for those who want to learn life-saving skills for family and community."
+                      duration="3 hours"
+                      capacity={16}
+                      price={65}
+                      nextDate="No upcoming classes scheduled"
+                      image={heartsaverImage}
+                      type="Heartsaver"
+                      onRegister={() => handleClassRegister('Heartsaver')}
+                      onLearnMore={() => handleClassLearnMore('Heartsaver')}
+                    />
+                  )}
+                </>
+              )}
             </div>
 
             {/* CTA Section */}
