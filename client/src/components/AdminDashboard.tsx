@@ -113,7 +113,10 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  Eye
+  Eye,
+  Filter,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon
 } from 'lucide-react';
 
 
@@ -128,6 +131,16 @@ export default function AdminDashboard() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
+  
+  // Client filters and pagination
+  const [clientFilters, setClientFilters] = useState({
+    certificationStatus: 'all',
+    courseType: 'all',
+    registrationDateRange: 'all',
+    lastCourseDateRange: 'all'
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const clientsPerPage = 10;
   
   // Class state
   const [classSearchTerm, setClassSearchTerm] = useState('');
@@ -442,12 +455,75 @@ export default function AdminDashboard() {
     })),
   });
 
-  const filteredClients = clients.filter(client =>
-    client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Helper function for date filtering
+  const getDateRangeFilter = (range: string, date: string) => {
+    if (range === 'all' || !date) return true;
+    
+    const clientDate = new Date(date);
+    const now = new Date();
+    
+    switch (range) {
+      case 'thisYear':
+        return clientDate.getFullYear() === now.getFullYear();
+      case 'last6Months':
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(now.getMonth() - 6);
+        return clientDate >= sixMonthsAgo;
+      case 'last30Days':
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(now.getDate() - 30);
+        return clientDate >= thirtyDaysAgo;
+      default:
+        return true;
+    }
+  };
+
+  const filteredClients = clients.filter(client => {
+    // Text search filter
+    const matchesSearch = 
+      client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Certification status filter
+    const matchesCertificationStatus = 
+      clientFilters.certificationStatus === 'all' ||
+      client.certificationStatus === clientFilters.certificationStatus;
+
+    // Course type filter
+    const matchesCourseType = 
+      clientFilters.courseType === 'all' ||
+      (clientFilters.courseType === 'bls' && client.completedCourses.includes('BLS')) ||
+      (clientFilters.courseType === 'heartsaver' && client.completedCourses.includes('Heartsaver')) ||
+      (clientFilters.courseType === 'both' && client.completedCourses.includes('BLS') && client.completedCourses.includes('Heartsaver')) ||
+      (clientFilters.courseType === 'none' && client.completedCourses.length === 0);
+
+    // Registration date range filter
+    const matchesRegistrationDate = getDateRangeFilter(
+      clientFilters.registrationDateRange,
+      client.registrationDate
+    );
+
+    // Last course date range filter
+    const matchesLastCourseDate = getDateRangeFilter(
+      clientFilters.lastCourseDateRange,
+      client.lastCourseDate || ''
+    );
+
+    return matchesSearch && matchesCertificationStatus && matchesCourseType && 
+           matchesRegistrationDate && matchesLastCourseDate;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredClients.length / clientsPerPage);
+  const startIndex = (currentPage - 1) * clientsPerPage;
+  const paginatedClients = filteredClients.slice(startIndex, startIndex + clientsPerPage);
+  
+  // Reset to page 1 when filters change
+  const resetPagination = () => {
+    setCurrentPage(1);
+  };
   
   const filteredClasses = classes.filter(classItem =>
     classItem.title.toLowerCase().includes(classSearchTerm.toLowerCase()) ||
@@ -811,16 +887,164 @@ export default function AdminDashboard() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent>
-            {/* Search */}
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search clients by name or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-clients"
-              />
+            {/* Search and Filters */}
+            <div className="space-y-4 mb-6">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search clients by name or email..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    resetPagination();
+                  }}
+                  className="pl-10"
+                  data-testid="input-search-clients"
+                />
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Filters:</span>
+                </div>
+
+                {/* Certification Status Filter */}
+                <Select 
+                  value={clientFilters.certificationStatus} 
+                  onValueChange={(value) => {
+                    setClientFilters(prev => ({ ...prev, certificationStatus: value }));
+                    resetPagination();
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-40" data-testid="select-filter-certification">
+                    <SelectValue placeholder="Certification" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Course Type Filter */}
+                <Select 
+                  value={clientFilters.courseType} 
+                  onValueChange={(value) => {
+                    setClientFilters(prev => ({ ...prev, courseType: value }));
+                    resetPagination();
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-40" data-testid="select-filter-course">
+                    <SelectValue placeholder="Course Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Courses</SelectItem>
+                    <SelectItem value="bls">BLS Only</SelectItem>
+                    <SelectItem value="heartsaver">Heartsaver Only</SelectItem>
+                    <SelectItem value="both">Both Courses</SelectItem>
+                    <SelectItem value="none">No Courses</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Registration Date Filter */}
+                <Select 
+                  value={clientFilters.registrationDateRange} 
+                  onValueChange={(value) => {
+                    setClientFilters(prev => ({ ...prev, registrationDateRange: value }));
+                    resetPagination();
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-44" data-testid="select-filter-registration-date">
+                    <SelectValue placeholder="Registration Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="thisYear">This Year</SelectItem>
+                    <SelectItem value="last6Months">Last 6 Months</SelectItem>
+                    <SelectItem value="last30Days">Last 30 Days</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Last Course Date Filter */}
+                <Select 
+                  value={clientFilters.lastCourseDateRange} 
+                  onValueChange={(value) => {
+                    setClientFilters(prev => ({ ...prev, lastCourseDateRange: value }));
+                    resetPagination();
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-44" data-testid="select-filter-last-course-date">
+                    <SelectValue placeholder="Last Course Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="thisYear">This Year</SelectItem>
+                    <SelectItem value="last6Months">Last 6 Months</SelectItem>
+                    <SelectItem value="last30Days">Last 30 Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Active Filters Summary */}
+              {(clientFilters.certificationStatus !== 'all' || 
+                clientFilters.courseType !== 'all' ||
+                clientFilters.registrationDateRange !== 'all' ||
+                clientFilters.lastCourseDateRange !== 'all') && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Active filters:</span>
+                  {clientFilters.certificationStatus !== 'all' && (
+                    <Badge variant="secondary">{clientFilters.certificationStatus}</Badge>
+                  )}
+                  {clientFilters.courseType !== 'all' && (
+                    <Badge variant="secondary">
+                      {clientFilters.courseType === 'bls' ? 'BLS' : 
+                       clientFilters.courseType === 'heartsaver' ? 'Heartsaver' :
+                       clientFilters.courseType === 'both' ? 'Both Courses' : 'No Courses'}
+                    </Badge>
+                  )}
+                  {clientFilters.registrationDateRange !== 'all' && (
+                    <Badge variant="secondary">
+                      Registered: {clientFilters.registrationDateRange === 'thisYear' ? 'This Year' :
+                                   clientFilters.registrationDateRange === 'last6Months' ? 'Last 6M' : 'Last 30D'}
+                    </Badge>
+                  )}
+                  {clientFilters.lastCourseDateRange !== 'all' && (
+                    <Badge variant="secondary">
+                      Last Course: {clientFilters.lastCourseDateRange === 'thisYear' ? 'This Year' :
+                                    clientFilters.lastCourseDateRange === 'last6Months' ? 'Last 6M' : 'Last 30D'}
+                    </Badge>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setClientFilters({
+                        certificationStatus: 'all',
+                        courseType: 'all',
+                        registrationDateRange: 'all',
+                        lastCourseDateRange: 'all'
+                      });
+                      resetPagination();
+                    }}
+                    className="h-6 px-2 text-xs"
+                    data-testid="button-clear-filters"
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              )}
+              
+              {/* Results Count */}
+              <div className="text-sm text-muted-foreground">
+                Showing {paginatedClients.length} of {filteredClients.length} clients
+                {filteredClients.length !== clients.length && (
+                  <span> (filtered from {clients.length} total)</span>
+                )}
+              </div>
             </div>
 
             {/* Clients Table */}
@@ -845,14 +1069,14 @@ export default function AdminDashboard() {
                         Loading clients...
                       </TableCell>
                     </TableRow>
-                  ) : filteredClients.length === 0 ? (
+                  ) : paginatedClients.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No clients found
+                        {filteredClients.length === 0 ? 'No clients found' : 'No clients on this page'}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredClients.map((client) => (
+                    paginatedClients.map((client) => (
                       <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
                         <TableCell className="font-medium">{client.firstName} {client.lastName}</TableCell>
                         <TableCell>{client.email}</TableCell>
@@ -901,6 +1125,68 @@ export default function AdminDashboard() {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    data-testid="button-previous-page"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  
+                  {/* Page Numbers */}
+                  <div className="flex gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="w-8 h-8 p-0"
+                          data-testid={`button-page-${pageNum}`}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                    <ChevronRightIcon className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
               </CardContent>
             </CollapsibleContent>
           </Card>
