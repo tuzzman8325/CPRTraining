@@ -550,6 +550,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/classes/:classId/roster", async (req, res) => {
+    try {
+      const { classId } = req.params;
+      
+      // Get class details
+      const classData = await storage.getClassById(classId);
+      if (!classData) {
+        return res.status(404).json({ error: "Class not found" });
+      }
+
+      // Get all registrations for this class
+      const registrations = await storage.getRegistrationsByClass(classId);
+      
+      // Enrich registration data with discount code information
+      const enrichedRegistrations = await Promise.all(
+        registrations.map(async (registration) => {
+          let discountCode = null;
+          if (registration.discountCodeId) {
+            const discountCodes = await storage.getDiscountCodes();
+            discountCode = discountCodes.find(dc => dc.id === registration.discountCodeId);
+          }
+          
+          return {
+            ...registration,
+            discountCode: discountCode ? {
+              code: discountCode.code,
+              description: discountCode.description
+            } : null
+          };
+        })
+      );
+
+      res.json({ 
+        success: true, 
+        classData,
+        registrations: enrichedRegistrations
+      });
+    } catch (error) {
+      console.error("Get class roster error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Stripe payment endpoint for class registration
   app.post("/api/create-payment-intent", async (req, res) => {
     try {

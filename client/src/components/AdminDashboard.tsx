@@ -111,7 +111,8 @@ import {
   Ticket,
   Copy,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  FileText
 } from 'lucide-react';
 
 
@@ -141,6 +142,9 @@ export default function AdminDashboard() {
   const [selectedDiscountCode, setSelectedDiscountCode] = useState<DiscountCode | null>(null);
   const [isAddDiscountCodeDialogOpen, setIsAddDiscountCodeDialogOpen] = useState(false);
   const [isEditDiscountCodeDialogOpen, setIsEditDiscountCodeDialogOpen] = useState(false);
+
+  // Roster state
+  const [isGeneratingRoster, setIsGeneratingRoster] = useState(false);
   
   // React Query hooks for clients
   const { data: clientsData, isLoading: clientsLoading } = useQuery<ClientsResponse>({
@@ -583,6 +587,57 @@ export default function AdminDashboard() {
     }
   };
 
+  // Roster generation function
+  const handleGenerateRoster = async (classItem: Class) => {
+    try {
+      setIsGeneratingRoster(true);
+      
+      const response = await fetch(`/api/classes/${classItem.id}/roster`);
+      const data = await response.json();
+      
+      if (data.success) {
+        // Import the PDF generation functions dynamically
+        const { pdf } = await import('@react-pdf/renderer');
+        const { ClassRosterPDF } = await import('./ClassRosterPDF');
+        
+        // Generate PDF blob
+        const pdfBlob = await pdf(
+          <ClassRosterPDF
+            classData={data.classData}
+            registrations={data.registrations}
+            generatedDate={new Date().toLocaleDateString('en-US')}
+          />
+        ).toBlob();
+        
+        // Create download link
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${classItem.title.replace(/[^a-zA-Z0-9]/g, '_')}_roster_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast({ 
+          title: "Roster Generated", 
+          description: `Class roster for "${classItem.title}" has been downloaded` 
+        });
+      } else {
+        throw new Error(data.error || 'Failed to generate roster');
+      }
+    } catch (error) {
+      console.error('Generate roster error:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to generate class roster",
+        variant: "destructive" 
+      });
+    } finally {
+      setIsGeneratingRoster(false);
+    }
+  };
+
   const stats = {
     totalClients: clients.length,
     activeClients: clients.filter(c => c.certificationStatus === 'active').length,
@@ -922,6 +977,14 @@ export default function AdminDashboard() {
                                 <DropdownMenuItem onClick={() => handleEditClass(classItem)}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleGenerateRoster(classItem)}
+                                  disabled={isGeneratingRoster}
+                                  data-testid={`button-generate-roster-${classItem.id}`}
+                                >
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  {isGeneratingRoster ? 'Generating...' : 'Generate Roster'}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   onClick={() => handleDeleteClass(classItem.id)}
