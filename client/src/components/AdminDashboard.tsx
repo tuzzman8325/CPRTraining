@@ -423,7 +423,7 @@ export default function AdminDashboard() {
       firstName: '',
       lastName: '',
       email: '',
-      phone: null,
+      phone: '',
       registrationDate: '',
       lastCourseDate: '',
       completedCourses: [],
@@ -553,9 +553,9 @@ export default function AdminDashboard() {
       firstName: latestClient.firstName,
       lastName: latestClient.lastName,
       email: latestClient.email,
-      phone: latestClient.phone,
+      phone: latestClient.phone || '',
       registrationDate: latestClient.registrationDate,
-      lastCourseDate: latestClient.lastCourseDate,
+      lastCourseDate: latestClient.lastCourseDate || '',
       completedCourses: latestClient.completedCourses,
       certificationStatus: latestClient.certificationStatus
     });
