@@ -550,6 +550,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/clients", async (req, res) => {
+    try {
+      const clientData = insertClientSchema.parse(req.body);
+      
+      // Calculate certification status from lastCourseDate
+      const storage_any = storage as any;
+      const certificationStatus = storage_any.calculateCertificationStatus ? 
+        storage_any.calculateCertificationStatus(clientData.lastCourseDate) : 
+        "active";
+      
+      const newClient = await storage.createClient({
+        ...clientData,
+        certificationStatus
+      });
+      
+      res.status(201).json({ 
+        success: true, 
+        client: newClient,
+        message: "Client created successfully"
+      });
+    } catch (error) {
+      console.error("Create client error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid client data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/classes/:classId/roster", async (req, res) => {
     try {
       const { classId } = req.params;
