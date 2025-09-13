@@ -1203,7 +1203,7 @@ export default function AdminDashboard() {
 
         {/* Edit Client Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Edit Client</DialogTitle>
               <DialogDescription>
@@ -1212,63 +1212,189 @@ export default function AdminDashboard() {
             </DialogHeader>
             
             {selectedClient && (
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-firstName" className="text-right">First Name</Label>
-                  <Input 
-                    id="edit-firstName" 
-                    value={selectedClient.firstName} 
-                    className="col-span-3"
-                    data-testid="input-edit-firstName"
+              <Form {...editClientForm}>
+                <form onSubmit={editClientForm.handleSubmit(onEditClientSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={editClientForm.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-edit-firstName" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editClientForm.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-edit-lastName" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={editClientForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="email" data-testid="input-edit-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-lastName" className="text-right">Last Name</Label>
-                  <Input 
-                    id="edit-lastName" 
-                    value={selectedClient.lastName} 
-                    className="col-span-3"
-                    data-testid="input-edit-lastName"
+                  
+                  <FormField
+                    control={editClientForm.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="tel" data-testid="input-edit-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-username" className="text-right">Username</Label>
-                  <Input 
-                    id="edit-username" 
-                    value={selectedClient.username} 
-                    className="col-span-3"
-                    data-testid="input-edit-username"
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={editClientForm.control}
+                      name="registrationDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Registration Date</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="date" data-testid="input-edit-registrationDate" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editClientForm.control}
+                      name="lastCourseDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Course Date</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="date" data-testid="input-edit-lastCourseDate" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={editClientForm.control}
+                    name="completedCourses"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Completed Courses</FormLabel>
+                        <FormDescription>
+                          Select all courses this client has completed
+                        </FormDescription>
+                        <div className="flex gap-4">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="course-bls"
+                              checked={field.value.includes('BLS')}
+                              onChange={(e) => {
+                                const current = field.value || [];
+                                if (e.target.checked) {
+                                  field.onChange([...current.filter(c => c !== 'BLS'), 'BLS']);
+                                } else {
+                                  field.onChange(current.filter(c => c !== 'BLS'));
+                                }
+                              }}
+                              data-testid="checkbox-course-bls"
+                            />
+                            <Label htmlFor="course-bls">BLS Provider</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="course-heartsaver"
+                              checked={field.value.includes('Heartsaver')}
+                              onChange={(e) => {
+                                const current = field.value || [];
+                                if (e.target.checked) {
+                                  field.onChange([...current.filter(c => c !== 'Heartsaver'), 'Heartsaver']);
+                                } else {
+                                  field.onChange(current.filter(c => c !== 'Heartsaver'));
+                                }
+                              }}
+                              data-testid="checkbox-course-heartsaver"
+                            />
+                            <Label htmlFor="course-heartsaver">Heartsaver CPR</Label>
+                          </div>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-email" className="text-right">Email</Label>
-                  <Input 
-                    id="edit-email" 
-                    value={selectedClient.email} 
-                    className="col-span-3"
-                    data-testid="input-edit-email"
+                  
+                  <FormField
+                    control={editClientForm.control}
+                    name="certificationStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Certification Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-edit-certificationStatus">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                            <SelectItem value="expired">Expired</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="edit-phone" className="text-right">Phone</Label>
-                  <Input 
-                    id="edit-phone" 
-                    value={selectedClient.phone} 
-                    className="col-span-3"
-                    data-testid="input-edit-phone"
-                  />
-                </div>
-              </div>
+                  
+                  <DialogFooter>
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsEditDialogOpen(false)}
+                      data-testid="button-cancel-edit-client"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={updateClientMutation.isPending}
+                      data-testid="button-save-client"
+                    >
+                      {updateClientMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
             )}
-            
-            <DialogFooter>
-              <Button 
-                onClick={() => setIsEditDialogOpen(false)}
-                data-testid="button-save-client"
-              >
-                Close
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -1847,6 +1973,201 @@ export default function AdminDashboard() {
                 </form>
               </Form>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Client Dialog */}
+        <Dialog open={isAddClientDialogOpen} onOpenChange={setIsAddClientDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Client</DialogTitle>
+              <DialogDescription>
+                Create a new client record for tracking CPR training and certifications.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Form {...addClientForm}>
+              <form onSubmit={addClientForm.handleSubmit(onAddClientSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={addClientForm.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="John" data-testid="input-add-firstName" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={addClientForm.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Doe" data-testid="input-add-lastName" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={addClientForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="email" placeholder="john.doe@example.com" data-testid="input-add-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={addClientForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="tel" placeholder="(555) 123-4567" data-testid="input-add-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={addClientForm.control}
+                    name="registrationDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Registration Date</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="date" data-testid="input-add-registrationDate" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={addClientForm.control}
+                    name="lastCourseDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Course Date</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="date" data-testid="input-add-lastCourseDate" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={addClientForm.control}
+                  name="completedCourses"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Completed Courses</FormLabel>
+                      <FormDescription>
+                        Select all courses this client has completed
+                      </FormDescription>
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="add-course-bls"
+                            checked={field.value.includes('BLS')}
+                            onChange={(e) => {
+                              const current = field.value || [];
+                              if (e.target.checked) {
+                                field.onChange([...current.filter(c => c !== 'BLS'), 'BLS']);
+                              } else {
+                                field.onChange(current.filter(c => c !== 'BLS'));
+                              }
+                            }}
+                            data-testid="checkbox-add-course-bls"
+                          />
+                          <Label htmlFor="add-course-bls">BLS Provider</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="add-course-heartsaver"
+                            checked={field.value.includes('Heartsaver')}
+                            onChange={(e) => {
+                              const current = field.value || [];
+                              if (e.target.checked) {
+                                field.onChange([...current.filter(c => c !== 'Heartsaver'), 'Heartsaver']);
+                              } else {
+                                field.onChange(current.filter(c => c !== 'Heartsaver'));
+                              }
+                            }}
+                            data-testid="checkbox-add-course-heartsaver"
+                          />
+                          <Label htmlFor="add-course-heartsaver">Heartsaver CPR</Label>
+                        </div>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={addClientForm.control}
+                  name="certificationStatus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Certification Status</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-add-certificationStatus">
+                            <SelectValue placeholder="Select certification status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                          <SelectItem value="expired">Expired</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <DialogFooter>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAddClientDialogOpen(false)}
+                    data-testid="button-cancel-add-client"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createClientMutation.isPending}
+                    data-testid="button-submit-add-client"
+                  >
+                    {createClientMutation.isPending ? 'Creating...' : 'Create Client'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
