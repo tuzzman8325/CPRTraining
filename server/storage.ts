@@ -44,7 +44,7 @@ export interface IStorage {
   updateClient(id: string, updates: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: string): Promise<boolean>;
   updateClientCertificationStatus(id: string, lastCourseDate: string, completedCourses: string[]): Promise<Client | undefined>;
-  getClientsByCertificationStatus(status: "active" | "inactive" | "expired"): Promise<Client[]>;
+  getClientsByCertificationStatus(status: "active" | "update" | "expired"): Promise<Client[]>;
 }
 
 export class MemStorage implements IStorage {
