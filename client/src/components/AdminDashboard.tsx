@@ -926,7 +926,7 @@ export default function AdminDashboard() {
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="update">Update</SelectItem>
                     <SelectItem value="expired">Expired</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1085,7 +1085,11 @@ export default function AdminDashboard() {
                         <TableCell>{client.registrationDate}</TableCell>
                         <TableCell>{client.lastCourseDate}</TableCell>
                         <TableCell>
-                          <Badge variant={client.certificationStatus === 'active' ? 'default' : client.certificationStatus === 'inactive' ? 'secondary' : 'destructive'}>
+                          <Badge variant={
+                            client.certificationStatus === 'active' ? 'success' : 
+                            client.certificationStatus === 'update' ? 'warning' : 
+                            'destructive'
+                          }>
                             {client.certificationStatus}
                           </Badge>
                         </TableCell>

@@ -246,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone: registrationData.phone || client.phone,
           lastCourseDate: classDate,
           completedCourses: updatedCompletedCourses,
-          certificationStatus: certificationStatus as "active" | "inactive" | "expired"
+          certificationStatus: certificationStatus as "active" | "update" | "expired"
         });
         console.log("Client updated successfully");
       } else {
@@ -260,7 +260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           registrationDate: currentDate,
           lastCourseDate: classDate,
           completedCourses: [courseType],
-          certificationStatus: "active" as "active" | "inactive" | "expired"
+          certificationStatus: "active" as "active" | "update" | "expired"
         };
         
         client = await storage.createClient(newClientData);

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 export const classTypeEnum = pgEnum("class_type", ["BLS", "Heartsaver"]);
 export const registrationStatusEnum = pgEnum("registration_status", ["pending", "confirmed", "cancelled"]);
-export const clientStatusEnum = pgEnum("client_status", ["active", "inactive", "expired"]);
+export const clientStatusEnum = pgEnum("client_status", ["active", "update", "expired"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

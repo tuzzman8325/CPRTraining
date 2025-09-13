@@ -266,7 +266,7 @@ export class MemStorage implements IStorage {
   }
 
   // Helper function to calculate certification status based on 2-year expiration
-  private calculateCertificationStatus(lastCourseDate: string): "active" | "inactive" | "expired" {
+  private calculateCertificationStatus(lastCourseDate: string): "active" | "update" | "expired" {
     const courseDate = new Date(lastCourseDate);
     const twoYearsLater = new Date(courseDate);
     twoYearsLater.setFullYear(courseDate.getFullYear() + 2);
@@ -278,7 +278,7 @@ export class MemStorage implements IStorage {
     if (today >= twoYearsLater) {
       return "expired";
     } else if (today >= sixtyDaysFromExpiration) {
-      return "inactive"; // Certification expires within 60 days
+      return "update"; // Certification expires within 60 days
     } else {
       return "active";
     }
@@ -361,7 +361,7 @@ export class MemStorage implements IStorage {
     return updatedClient;
   }
 
-  async getClientsByCertificationStatus(status: "active" | "inactive" | "expired"): Promise<Client[]> {
+  async getClientsByCertificationStatus(status: "active" | "update" | "expired"): Promise<Client[]> {
     return Array.from(this.clients.values()).filter(client => client.certificationStatus === status);
   }
 }
@@ -522,7 +522,7 @@ export class DbStorage implements IStorage {
   }
 
   // Helper function to calculate certification status based on 2-year expiration
-  private calculateCertificationStatus(lastCourseDate: string): "active" | "inactive" | "expired" {
+  private calculateCertificationStatus(lastCourseDate: string): "active" | "update" | "expired" {
     const courseDate = new Date(lastCourseDate);
     const twoYearsLater = new Date(courseDate);
     twoYearsLater.setFullYear(courseDate.getFullYear() + 2);
@@ -534,7 +534,7 @@ export class DbStorage implements IStorage {
     if (today >= twoYearsLater) {
       return "expired";
     } else if (today >= sixtyDaysFromExpiration) {
-      return "inactive"; // Certification expires within 60 days
+      return "update"; // Certification expires within 60 days
     } else {
       return "active";
     }
@@ -601,7 +601,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getClientsByCertificationStatus(status: "active" | "inactive" | "expired"): Promise<Client[]> {
+  async getClientsByCertificationStatus(status: "active" | "update" | "expired"): Promise<Client[]> {
     return await db.select().from(clients).where(eq(clients.certificationStatus, status));
   }
 }

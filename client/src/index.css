@@ -76,6 +76,13 @@
   --chart-4: 30 70% 45%;
   --chart-5: 280 50% 50%;
 
+  /* Certification status colors */
+  --success: 142 76% 36%;
+  --success-foreground: 0 0% 100%;
+  
+  --warning: 43 96% 56%;
+  --warning-foreground: 21 92% 14%;
+
   --font-sans: Open Sans, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
@@ -185,6 +192,13 @@
   --destructive: 0 75% 35%;
 
   --destructive-foreground: 0 0% 100%;
+
+  /* Certification status colors for dark mode */
+  --success: 142 76% 45%;
+  --success-foreground: 0 0% 100%;
+  
+  --warning: 43 96% 65%;
+  --warning-foreground: 21 92% 14%;
 
   --input: 220 30% 20%;
   --ring: 0 75% 35%;
