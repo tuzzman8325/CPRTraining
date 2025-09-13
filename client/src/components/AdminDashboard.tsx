@@ -8,6 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { TimeInput } from '@/components/ui/time-input';
 import { 
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { 
   Table, 
   TableBody, 
   TableCell, 
@@ -49,7 +54,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Class, InsertClass, insertClassSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema } from '@shared/schema';
+import { Class, InsertClass, insertClassSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema, Client, InsertClient, insertClientSchema } from '@shared/schema';
 import { z } from 'zod';
 
 // API Response types
@@ -79,6 +84,18 @@ interface DiscountCodeResponse {
   discountCode: DiscountCode;
   message: string;
 }
+
+interface ClientsResponse {
+  success: boolean;
+  clients: Client[];
+}
+
+interface ClientResponse {
+  success: boolean;
+  client: Client;
+  message: string;
+}
+
 import { 
   Search, 
   Plus, 
@@ -92,66 +109,23 @@ import {
   BookOpen,
   ClipboardList,
   Ticket,
-  Copy
+  Copy,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 
-interface Client {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  username: string;
-  registrationDate: string;
-  completedCourses: string[];
-  status: 'Active' | 'Inactive';
-}
-
-// TODO: Remove mock data - replace with real client data from backend
-const mockClients: Client[] = [
-  {
-    id: '1',
-    firstName: 'John',
-    lastName: 'Smith',
-    email: 'john.smith@email.com',
-    phone: '(555) 123-4567',
-    username: 'jsmith',
-    registrationDate: '2024-01-15',
-    completedCourses: ['BLS Provider', 'Heartsaver CPR'],
-    status: 'Active'
-  },
-  {
-    id: '2',
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    email: 'sarah.johnson@email.com',
-    phone: '(555) 234-5678',
-    username: 'sjohnson',
-    registrationDate: '2024-02-20',
-    completedCourses: ['Heartsaver CPR'],
-    status: 'Active'
-  },
-  {
-    id: '3',
-    firstName: 'Mike',
-    lastName: 'Wilson',
-    email: 'mike.wilson@email.com',
-    phone: '(555) 345-6789',
-    username: 'mwilson',
-    registrationDate: '2024-01-08',
-    completedCourses: ['BLS Provider'],
-    status: 'Inactive'
-  }
-];
 
 export default function AdminDashboard() {
   const { toast } = useToast();
   
+  // Collapsible section state - only one section open at a time
+  const [openSection, setOpenSection] = useState<string>('clients');
+  
   // Client state
-  const [clients, setClients] = useState<Client[]>(mockClients);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
   
   // Class state
   const [classSearchTerm, setClassSearchTerm] = useState('');
@@ -168,6 +142,11 @@ export default function AdminDashboard() {
   const [isAddDiscountCodeDialogOpen, setIsAddDiscountCodeDialogOpen] = useState(false);
   const [isEditDiscountCodeDialogOpen, setIsEditDiscountCodeDialogOpen] = useState(false);
   
+  // React Query hooks for clients
+  const { data: clientsData, isLoading: clientsLoading } = useQuery<ClientsResponse>({
+    queryKey: ['/api/clients'],
+  });
+
   // React Query hooks for classes
   const { data: classesData, isLoading: classesLoading } = useQuery<ClassesResponse>({
     queryKey: ['/api/classes'],
@@ -183,6 +162,7 @@ export default function AdminDashboard() {
     queryKey: ['/api/discount-codes'],
   });
   
+  const clients: Client[] = clientsData?.clients || [];
   const classes: Class[] = classesData?.classes || [];
   const discountCodes: DiscountCode[] = discountCodesData?.discountCodes || [];
   
@@ -283,6 +263,49 @@ export default function AdminDashboard() {
       toast({ title: "Error", description: `Failed to delete discount code: ${error.message}`, variant: "destructive" });
     }
   });
+
+  // Client mutations
+  const createClientMutation = useMutation({
+    mutationFn: async (data: InsertClient) => {
+      return await apiRequest('POST', '/api/clients', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      setIsAddClientDialogOpen(false);
+      toast({ title: "Success", description: "Client created successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to create client: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const updateClientMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertClient> }) => {
+      return await apiRequest('PUT', `/api/clients/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      setIsEditDialogOpen(false);
+      setSelectedClient(null);
+      toast({ title: "Success", description: "Client updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to update client: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const deleteClientMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/clients/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      toast({ title: "Success", description: "Client deleted successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to delete client: ${error.message}`, variant: "destructive" });
+    }
+  });
   
   // Form setup for adding classes
   const addClassForm = useForm<InsertClass>({
@@ -351,12 +374,69 @@ export default function AdminDashboard() {
     })),
   });
 
+  // Form setup for adding clients
+  const addClientForm = useForm<InsertClient>({
+    resolver: zodResolver(insertClientSchema.extend({
+      registrationDate: insertClientSchema.shape.registrationDate.refine(
+        (date) => {
+          const inputDate = new Date(date + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return inputDate <= today;
+        },
+        { message: "Registration date cannot be in the future" }
+      ),
+      lastCourseDate: insertClientSchema.shape.lastCourseDate.refine(
+        (date) => {
+          const inputDate = new Date(date + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return inputDate <= today;
+        },
+        { message: "Last course date cannot be in the future" }
+      )
+    })),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: null,
+      registrationDate: '',
+      lastCourseDate: '',
+      completedCourses: [],
+      certificationStatus: 'active'
+    }
+  });
+
+  // Form setup for editing clients
+  const editClientForm = useForm<InsertClient>({
+    resolver: zodResolver(insertClientSchema.extend({
+      registrationDate: insertClientSchema.shape.registrationDate.refine(
+        (date) => {
+          const inputDate = new Date(date + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return inputDate <= today;
+        },
+        { message: "Registration date cannot be in the future" }
+      ),
+      lastCourseDate: insertClientSchema.shape.lastCourseDate.refine(
+        (date) => {
+          const inputDate = new Date(date + 'T00:00:00');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return inputDate <= today;
+        },
+        { message: "Last course date cannot be in the future" }
+      )
+    })),
+  });
+
   const filteredClients = clients.filter(client =>
     client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.username.toLowerCase().includes(searchTerm.toLowerCase())
+    client.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
   const filteredClasses = classes.filter(classItem =>
@@ -380,25 +460,38 @@ export default function AdminDashboard() {
   // Client handlers
   const handleEdit = (client: Client) => {
     setSelectedClient(client);
+    editClientForm.reset({
+      firstName: client.firstName,
+      lastName: client.lastName,
+      email: client.email,
+      phone: client.phone,
+      registrationDate: client.registrationDate,
+      lastCourseDate: client.lastCourseDate,
+      completedCourses: client.completedCourses,
+      certificationStatus: client.certificationStatus
+    });
     setIsEditDialogOpen(true);
-    console.log('Edit client:', `${client.firstName} ${client.lastName}`);
   };
 
   const handleDelete = (clientId: string) => {
-    setClients(clients.filter(c => c.id !== clientId));
-    console.log('Delete client:', clientId);
-    // TODO: Implement delete functionality
+    if (window.confirm('Are you sure you want to delete this client?')) {
+      deleteClientMutation.mutate(clientId);
+    }
   };
 
   const handleAddClient = () => {
-    console.log('Add new client');
-    // TODO: Implement add client functionality
+    addClientForm.reset();
+    setIsAddClientDialogOpen(true);
   };
 
-  const handleSaveClient = () => {
-    setIsEditDialogOpen(false);
-    console.log('Save client changes');
-    // TODO: Implement save functionality
+  const onAddClientSubmit = (data: InsertClient) => {
+    createClientMutation.mutate(data);
+  };
+
+  const onEditClientSubmit = (data: InsertClient) => {
+    if (selectedClient) {
+      updateClientMutation.mutate({ id: selectedClient.id, data });
+    }
   };
   
   // Class handlers
@@ -492,13 +585,18 @@ export default function AdminDashboard() {
 
   const stats = {
     totalClients: clients.length,
-    activeClients: clients.filter(c => c.status === 'Active').length,
+    activeClients: clients.filter(c => c.certificationStatus === 'active').length,
     totalCertifications: clients.reduce((sum, client) => sum + client.completedCourses.length, 0),
     totalClasses: classes.length,
     availableSpots: classes.reduce((sum, classItem) => sum + classItem.available, 0),
     totalRegistrations: registrations.length,
     pendingRegistrations: registrations.filter(r => r.status === 'pending').length,
     monthlyRevenue: 2450 // TODO: Calculate from actual data
+  };
+
+  // Toggle collapsible sections
+  const toggleSection = (section: string) => {
+    setOpenSection(openSection === section ? '' : section);
   };
 
   return (
@@ -610,17 +708,29 @@ export default function AdminDashboard() {
         </div>
 
         {/* Client Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Client Management</CardTitle>
-            <CardDescription>View and manage all registered clients</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Collapsible open={openSection === 'clients'} onOpenChange={() => toggleSection('clients')}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-clients">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Client Management
+                    </CardTitle>
+                    <CardDescription>View and manage all registered clients</CardDescription>
+                  </div>
+                  {openSection === 'clients' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
             {/* Search */}
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search clients by name, email, or username..."
+                placeholder="Search clients by name or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -634,72 +744,102 @@ export default function AdminDashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Username</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
+                    <TableHead>Registration Date</TableHead>
+                    <TableHead>Last Course</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Courses</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredClients.map((client) => (
-                    <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
-                      <TableCell className="font-medium">{client.firstName} {client.lastName}</TableCell>
-                      <TableCell>{client.username}</TableCell>
-                      <TableCell>{client.email}</TableCell>
-                      <TableCell>{client.phone}</TableCell>
-                      <TableCell>
-                        <Badge variant={client.status === 'Active' ? 'default' : 'secondary'}>
-                          {client.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {client.completedCourses.map((course, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
-                              {course}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" data-testid={`button-actions-${client.id}`}>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(client)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDelete(client.id)}
-                              className="text-destructive"
-                            >
-                              <Trash className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                  {clientsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        Loading clients...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : filteredClients.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No clients found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredClients.map((client) => (
+                      <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
+                        <TableCell className="font-medium">{client.firstName} {client.lastName}</TableCell>
+                        <TableCell>{client.email}</TableCell>
+                        <TableCell>{client.phone || 'N/A'}</TableCell>
+                        <TableCell>{client.registrationDate}</TableCell>
+                        <TableCell>{client.lastCourseDate}</TableCell>
+                        <TableCell>
+                          <Badge variant={client.certificationStatus === 'active' ? 'default' : client.certificationStatus === 'inactive' ? 'secondary' : 'destructive'}>
+                            {client.certificationStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {client.completedCourses.map((course, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {course}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-actions-${client.id}`}>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(client)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleDelete(client.id)}
+                                className="text-destructive"
+                              >
+                                <Trash className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Class Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Class Management</CardTitle>
-            <CardDescription>View and manage all training classes</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Collapsible open={openSection === 'classes'} onOpenChange={() => toggleSection('classes')}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-classes">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5" />
+                      Class Management
+                    </CardTitle>
+                    <CardDescription>View and manage all training classes</CardDescription>
+                  </div>
+                  {openSection === 'classes' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
             {/* Search */}
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -788,16 +928,30 @@ export default function AdminDashboard() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Registration Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Registration Management</CardTitle>
-            <CardDescription>View and manage all class registrations</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Collapsible open={openSection === 'registrations'} onOpenChange={() => toggleSection('registrations')}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-registrations">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5" />
+                      Registration Management
+                    </CardTitle>
+                    <CardDescription>View and manage all class registrations</CardDescription>
+                  </div>
+                  {openSection === 'registrations' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
             {/* Search */}
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -900,16 +1054,30 @@ export default function AdminDashboard() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Discount Code Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Discount Code Management</CardTitle>
-            <CardDescription>Create and manage discount codes for free class registrations</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Collapsible open={openSection === 'discount-codes'} onOpenChange={() => toggleSection('discount-codes')}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-discount-codes">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Ticket className="h-5 w-5" />
+                      Discount Code Management
+                    </CardTitle>
+                    <CardDescription>Create and manage discount codes for free class registrations</CardDescription>
+                  </div>
+                  {openSection === 'discount-codes' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
             {/* Search */}
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1028,8 +1196,10 @@ export default function AdminDashboard() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Edit Client Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -1093,10 +1263,10 @@ export default function AdminDashboard() {
             
             <DialogFooter>
               <Button 
-                onClick={handleSaveClient}
+                onClick={() => setIsEditDialogOpen(false)}
                 data-testid="button-save-client"
               >
-                Save Changes
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>
