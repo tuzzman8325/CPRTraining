@@ -1,7 +1,7 @@
-import { type User, type InsertUser, type Class, type InsertClass, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode } from "@shared/schema";
+import { type User, type InsertUser, type Class, type InsertClass, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode, type Client, type InsertClient } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, classes, registrations, discountCodes } from "@shared/schema";
+import { users, classes, registrations, discountCodes, clients } from "@shared/schema";
 import { eq, sql, and, lt } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
@@ -35,6 +35,16 @@ export interface IStorage {
   deleteDiscountCode(id: string): Promise<boolean>;
   validateDiscountCode(code: string): Promise<{ valid: boolean; discountCode?: DiscountCode; reason?: string }>;
   useDiscountCode(code: string): Promise<boolean>;
+  
+  // Client CRUD operations
+  getClients(): Promise<Client[]>;
+  getClientById(id: string): Promise<Client | undefined>;
+  getClientByEmail(email: string): Promise<Client | undefined>;
+  createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: string, updates: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: string): Promise<boolean>;
+  updateClientCertificationStatus(id: string, lastCourseDate: string, completedCourses: string[]): Promise<Client | undefined>;
+  getClientsByCertificationStatus(status: "active" | "inactive" | "expired"): Promise<Client[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -42,12 +52,14 @@ export class MemStorage implements IStorage {
   private classes: Map<string, Class>;
   private registrations: Map<string, Registration>;
   private discountCodes: Map<string, DiscountCode>;
+  private clients: Map<string, Client>;
 
   constructor() {
     this.users = new Map();
     this.classes = new Map();
     this.registrations = new Map();
     this.discountCodes = new Map();
+    this.clients = new Map();
   }
 
   // Helper function to generate random discount code in ABCD-EFGH format
@@ -252,6 +264,106 @@ export class MemStorage implements IStorage {
     this.discountCodes.set(validation.discountCode.id, updated);
     return true;
   }
+
+  // Helper function to calculate certification status based on 2-year expiration
+  private calculateCertificationStatus(lastCourseDate: string): "active" | "inactive" | "expired" {
+    const courseDate = new Date(lastCourseDate);
+    const twoYearsLater = new Date(courseDate);
+    twoYearsLater.setFullYear(courseDate.getFullYear() + 2);
+    
+    const today = new Date();
+    const sixtyDaysFromExpiration = new Date(twoYearsLater);
+    sixtyDaysFromExpiration.setDate(twoYearsLater.getDate() - 60);
+    
+    if (today >= twoYearsLater) {
+      return "expired";
+    } else if (today >= sixtyDaysFromExpiration) {
+      return "inactive"; // Certification expires within 60 days
+    } else {
+      return "active";
+    }
+  }
+
+  // Client CRUD operations
+  async getClients(): Promise<Client[]> {
+    return Array.from(this.clients.values());
+  }
+
+  async getClientById(id: string): Promise<Client | undefined> {
+    return this.clients.get(id);
+  }
+
+  async getClientByEmail(email: string): Promise<Client | undefined> {
+    return Array.from(this.clients.values()).find(client => client.email === email);
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    const id = randomUUID();
+    const certificationStatus = this.calculateCertificationStatus(insertClient.lastCourseDate);
+    
+    const client: Client = {
+      ...insertClient,
+      id,
+      registrationDate: insertClient.registrationDate,
+      lastCourseDate: insertClient.lastCourseDate,
+      completedCourses: insertClient.completedCourses || [],
+      certificationStatus,
+      phone: insertClient.phone || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.clients.set(id, client);
+    return client;
+  }
+
+  async updateClient(id: string, updates: Partial<InsertClient>): Promise<Client | undefined> {
+    const existingClient = this.clients.get(id);
+    if (!existingClient) {
+      return undefined;
+    }
+    
+    const updatedData = { ...updates };
+    
+    // Recalculate certification status if lastCourseDate is being updated
+    if (updatedData.lastCourseDate) {
+      updatedData.certificationStatus = this.calculateCertificationStatus(updatedData.lastCourseDate) as any;
+    }
+    
+    const updatedClient: Client = {
+      ...existingClient,
+      ...updatedData,
+      updatedAt: new Date()
+    };
+    this.clients.set(id, updatedClient);
+    return updatedClient;
+  }
+
+  async deleteClient(id: string): Promise<boolean> {
+    return this.clients.delete(id);
+  }
+
+  async updateClientCertificationStatus(id: string, lastCourseDate: string, completedCourses: string[]): Promise<Client | undefined> {
+    const existingClient = this.clients.get(id);
+    if (!existingClient) {
+      return undefined;
+    }
+
+    const certificationStatus = this.calculateCertificationStatus(lastCourseDate);
+    const updatedClient: Client = {
+      ...existingClient,
+      lastCourseDate,
+      completedCourses,
+      certificationStatus,
+      updatedAt: new Date()
+    };
+    
+    this.clients.set(id, updatedClient);
+    return updatedClient;
+  }
+
+  async getClientsByCertificationStatus(status: "active" | "inactive" | "expired"): Promise<Client[]> {
+    return Array.from(this.clients.values()).filter(client => client.certificationStatus === status);
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -407,6 +519,90 @@ export class DbStorage implements IStorage {
       sql`UPDATE discount_codes SET used_count = used_count + 1 WHERE code = ${code}`
     );
     return true;
+  }
+
+  // Helper function to calculate certification status based on 2-year expiration
+  private calculateCertificationStatus(lastCourseDate: string): "active" | "inactive" | "expired" {
+    const courseDate = new Date(lastCourseDate);
+    const twoYearsLater = new Date(courseDate);
+    twoYearsLater.setFullYear(courseDate.getFullYear() + 2);
+    
+    const today = new Date();
+    const sixtyDaysFromExpiration = new Date(twoYearsLater);
+    sixtyDaysFromExpiration.setDate(twoYearsLater.getDate() - 60);
+    
+    if (today >= twoYearsLater) {
+      return "expired";
+    } else if (today >= sixtyDaysFromExpiration) {
+      return "inactive"; // Certification expires within 60 days
+    } else {
+      return "active";
+    }
+  }
+
+  // Client CRUD operations
+  async getClients(): Promise<Client[]> {
+    return await db.select().from(clients);
+  }
+
+  async getClientById(id: string): Promise<Client | undefined> {
+    const result = await db.select().from(clients).where(eq(clients.id, id));
+    return result[0];
+  }
+
+  async getClientByEmail(email: string): Promise<Client | undefined> {
+    const result = await db.select().from(clients).where(eq(clients.email, email));
+    return result[0];
+  }
+
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    const certificationStatus = this.calculateCertificationStatus(insertClient.lastCourseDate);
+    
+    const result = await db.insert(clients).values({
+      ...insertClient,
+      registrationDate: insertClient.registrationDate,
+      lastCourseDate: insertClient.lastCourseDate,
+      completedCourses: insertClient.completedCourses || [],
+      certificationStatus
+    }).returning();
+    return result[0];
+  }
+
+  async updateClient(id: string, updates: Partial<InsertClient>): Promise<Client | undefined> {
+    const updateData: any = { ...updates };
+    
+    // Recalculate certification status if lastCourseDate is being updated
+    if (updateData.lastCourseDate) {
+      updateData.certificationStatus = this.calculateCertificationStatus(updateData.lastCourseDate);
+    }
+    
+    // Set updatedAt timestamp
+    updateData.updatedAt = new Date();
+    
+    const result = await db.update(clients).set(updateData).where(eq(clients.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteClient(id: string): Promise<boolean> {
+    const result = await db.delete(clients).where(eq(clients.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async updateClientCertificationStatus(id: string, lastCourseDate: string, completedCourses: string[]): Promise<Client | undefined> {
+    const certificationStatus = this.calculateCertificationStatus(lastCourseDate);
+    
+    const result = await db.update(clients).set({
+      lastCourseDate,
+      completedCourses,
+      certificationStatus,
+      updatedAt: new Date()
+    }).where(eq(clients.id, id)).returning();
+    
+    return result[0];
+  }
+
+  async getClientsByCertificationStatus(status: "active" | "inactive" | "expired"): Promise<Client[]> {
+    return await db.select().from(clients).where(eq(clients.certificationStatus, status));
   }
 }
 
