@@ -417,7 +417,7 @@ export default function AdminDashboard() {
       return await apiRequest('DELETE', `/api/users/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      queryClient.refetchQueries({ queryKey: ['/api/users'] });
       setIsDeleteUserDialogOpen(false);
       setSelectedUserForDeletion(null);
       toast({ title: "Success", description: "User deleted successfully" });
