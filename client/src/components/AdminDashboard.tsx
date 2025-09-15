@@ -58,6 +58,14 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Class, InsertClass, insertClassSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema, Client, InsertClient, insertClientSchema, User } from '@shared/schema';
 import { z } from 'zod';
 
+// Enriched Registration type with discount code information
+interface EnrichedRegistration extends Registration {
+  discountCode?: {
+    code: string;
+    description: string;
+  } | null;
+}
+
 // API Response types
 interface ClassesResponse {
   success: boolean;
@@ -72,7 +80,7 @@ interface ClassResponse {
 
 interface RegistrationsResponse {
   success: boolean;
-  registrations: Registration[];
+  registrations: EnrichedRegistration[];
 }
 
 interface DiscountCodesResponse {
@@ -201,6 +209,8 @@ export default function AdminDashboard() {
   // React Query hooks for registrations
   const { data: registrationsData, isLoading: registrationsLoading } = useQuery<RegistrationsResponse>({
     queryKey: ['/api/registrations'],
+    staleTime: 0, // Force fresh fetch
+    gcTime: 0, // Don't cache during development (React Query v5)
   });
 
   // React Query hooks for discount codes

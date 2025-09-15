@@ -59,6 +59,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  // Shared utility for enriching registrations with discount code data
+  async function enrichRegistrationsWithDiscountCodes(registrations: any[]) {
+    const discountCodes = await storage.getDiscountCodes();
+    
+    // Create maps for fast lookup by both id and code
+    const discountCodesByCodeId = new Map();
+    const discountCodesByCode = new Map();
+    
+    discountCodes.forEach(dc => {
+      discountCodesByCodeId.set(dc.id, dc);
+      discountCodesByCode.set(dc.code, dc);
+    });
+    
+    return registrations.map(registration => {
+      let discountCode = null;
+      
+      // Try to find discount code by discountCodeId first
+      if (registration.discountCodeId) {
+        discountCode = discountCodesByCodeId.get(registration.discountCodeId);
+      }
+      
+      // If not found by ID, try by code string (for backward compatibility)
+      if (!discountCode && registration.discountCode) {
+        discountCode = discountCodesByCode.get(registration.discountCode);
+      }
+      
+      return {
+        ...registration,
+        discountCode: discountCode ? {
+          code: discountCode.code,
+          description: discountCode.description
+        } : null
+      };
+    });
+  }
+
   // User management routes (admin only)
   app.get("/api/users", requireAdmin, async (req, res) => {
     try {
@@ -256,26 +292,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/registrations", requireAdmin, async (req, res) => {
     try {
       const registrations = await storage.getRegistrations();
+      const enrichedRegistrations = await enrichRegistrationsWithDiscountCodes(registrations);
       
-      // Enrich registration data with discount code information
-      const enrichedRegistrations = await Promise.all(
-        registrations.map(async (registration) => {
-          let discountCode = null;
-          if (registration.discountCodeId) {
-            const discountCodes = await storage.getDiscountCodes();
-            discountCode = discountCodes.find(dc => dc.id === registration.discountCodeId);
-          }
-          
-          return {
-            ...registration,
-            discountCode: discountCode ? {
-              code: discountCode.code, // This will be in ABCD-EFGH format
-              description: discountCode.description
-            } : null
-          };
-        })
-      );
-      
+      // Force fresh response (disable caching during development)
+      res.set('Cache-Control', 'no-store');
       res.json({ success: true, registrations: enrichedRegistrations });
     } catch (error) {
       console.error("Get registrations error:", error);
@@ -696,26 +716,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all registrations for this class
       const registrations = await storage.getRegistrationsByClass(classId);
-      
-      // Enrich registration data with discount code information
-      const enrichedRegistrations = await Promise.all(
-        registrations.map(async (registration) => {
-          let discountCode = null;
-          if (registration.discountCodeId) {
-            const discountCodes = await storage.getDiscountCodes();
-            discountCode = discountCodes.find(dc => dc.id === registration.discountCodeId);
-          }
-          
-          return {
-            ...registration,
-            discountCode: discountCode ? {
-              code: discountCode.code,
-              description: discountCode.description
-            } : null
-          };
-        })
-      );
+      const enrichedRegistrations = await enrichRegistrationsWithDiscountCodes(registrations);
 
+      // Force fresh response (disable caching during development)
+      res.set('Cache-Control', 'no-store');
       res.json({ 
         success: true, 
         classData,
