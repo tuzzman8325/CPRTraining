@@ -533,8 +533,11 @@ export class DbStorage implements IStorage {
         };
       }
       
-      const result = await db.delete(users).where(eq(users.id, id));
-      return { success: (result.rowCount ?? 0) > 0 };
+      await db.delete(users).where(eq(users.id, id));
+      
+      // Verify the user was actually deleted by trying to fetch it
+      const deletedUser = await this.getUser(id);
+      return { success: !deletedUser };
     } catch (error) {
       // Handle potential foreign key constraint errors
       if (error instanceof Error && error.message.includes('foreign key constraint')) {
