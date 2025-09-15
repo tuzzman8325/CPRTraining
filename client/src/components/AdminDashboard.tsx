@@ -53,8 +53,9 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Class, InsertClass, insertClassSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema, Client, InsertClient, insertClientSchema } from '@shared/schema';
+import { Class, InsertClass, insertClassSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema, Client, InsertClient, insertClientSchema, User } from '@shared/schema';
 import { z } from 'zod';
 
 // API Response types
@@ -96,6 +97,17 @@ interface ClientResponse {
   message: string;
 }
 
+interface UsersResponse {
+  success: boolean;
+  users: User[];
+}
+
+interface UserResponse {
+  success: boolean;
+  user: User;
+  message: string;
+}
+
 import { 
   Search, 
   Plus, 
@@ -122,6 +134,7 @@ import {
 
 export default function AdminDashboard() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   
   // Collapsible section state - only one section open at a time
   const [openSection, setOpenSection] = useState<string>('clients');
@@ -162,6 +175,9 @@ export default function AdminDashboard() {
   const [isAddDiscountCodeDialogOpen, setIsAddDiscountCodeDialogOpen] = useState(false);
   const [isEditDiscountCodeDialogOpen, setIsEditDiscountCodeDialogOpen] = useState(false);
 
+  // User Management state
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+
   // Roster state
   const [isGeneratingRoster, setIsGeneratingRoster] = useState(false);
   
@@ -184,10 +200,16 @@ export default function AdminDashboard() {
   const { data: discountCodesData, isLoading: discountCodesLoading } = useQuery<DiscountCodesResponse>({
     queryKey: ['/api/discount-codes'],
   });
+
+  // React Query hooks for users
+  const { data: usersData, isLoading: usersLoading } = useQuery<UsersResponse>({
+    queryKey: ['/api/users'],
+  });
   
   const clients: Client[] = clientsData?.clients || [];
   const classes: Class[] = classesData?.classes || [];
   const discountCodes: DiscountCode[] = discountCodesData?.discountCodes || [];
+  const users: User[] = usersData?.users || [];
   
   const createClassMutation = useMutation({
     mutationFn: async (data: InsertClass) => {
@@ -352,6 +374,33 @@ export default function AdminDashboard() {
     },
     onError: (error) => {
       toast({ title: "Error", description: `Failed to delete client: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  // User role update mutation
+  const updateUserRoleMutation = useMutation({
+    mutationFn: async ({ id, role }: { id: string; role: 'user' | 'admin' }) => {
+      return await apiRequest('PUT', `/api/users/${id}/role`, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({ title: "Success", description: "User role updated successfully" });
+    },
+    onError: (error: any) => {
+      let errorMessage = "Failed to update user role";
+      
+      // Handle specific error messages from backend
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = `Failed to update user role: ${error.message}`;
+      }
+      
+      toast({ 
+        title: "Error", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     }
   });
   
@@ -879,6 +928,151 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* User Management */}
+        <Collapsible open={openSection === 'users'} onOpenChange={() => toggleSection('users')}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-users">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      User Management
+                    </CardTitle>
+                    <CardDescription>Manage user accounts and permissions</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {openSection === 'users' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                {/* Search and Filter */}
+                <div className="flex items-center gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Search users by name or email..."
+                      value={userSearchTerm}
+                      onChange={(e) => setUserSearchTerm(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-search-users"
+                    />
+                  </div>
+                </div>
+
+                {/* Users Table */}
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead data-testid="header-name">Name</TableHead>
+                        <TableHead data-testid="header-email">Email</TableHead>
+                        <TableHead data-testid="header-role">Current Role</TableHead>
+                        <TableHead data-testid="header-actions">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {usersLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8" data-testid="loading-users">
+                            Loading users...
+                          </TableCell>
+                        </TableRow>
+                      ) : (() => {
+                        const filteredUsers = users.filter(user => 
+                          `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                          (user.email || '').toLowerCase().includes(userSearchTerm.toLowerCase())
+                        );
+                        
+                        if (filteredUsers.length === 0) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground" data-testid="no-users-found">
+                                {userSearchTerm ? `No users found matching "${userSearchTerm}"` : 'No users found'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+                        
+                        return filteredUsers.map((user) => {
+                          const isCurrentUser = currentUser?.id === user.id;
+                          const canDemote = user.role === 'admin' && !isCurrentUser;
+                          
+                          return (
+                            <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  {user.firstName && user.lastName ? 
+                                    `${user.firstName} ${user.lastName}` : 
+                                    user.email || 'Unknown User'
+                                  }
+                                  {isCurrentUser && (
+                                    <Badge variant="outline" className="text-xs" data-testid="badge-current-user">
+                                      You
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>{user.email || 'No email'}</TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={user.role === 'admin' ? 'default' : 'secondary'}
+                                  className={user.role === 'admin' ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}
+                                  data-testid={`badge-role-${user.role}`}
+                                >
+                                  {user.role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-2">
+                                  {user.role === 'user' ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => updateUserRoleMutation.mutate({ id: user.id, role: 'admin' })}
+                                      disabled={updateUserRoleMutation.isPending}
+                                      data-testid={`button-promote-${user.id}`}
+                                    >
+                                      Promote to Admin
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        if (isCurrentUser) {
+                                          const confirmed = window.confirm(
+                                            'Warning: You are about to demote yourself from admin. This will remove your admin privileges. Are you sure you want to continue?'
+                                          );
+                                          if (!confirmed) return;
+                                        }
+                                        updateUserRoleMutation.mutate({ id: user.id, role: 'user' });
+                                      }}
+                                      disabled={updateUserRoleMutation.isPending}
+                                      data-testid={`button-demote-${user.id}`}
+                                      className={isCurrentUser ? 'border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground' : ''}
+                                    >
+                                      {isCurrentUser ? 'Demote Yourself' : 'Demote to User'}
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        });
+                      })()
+                      }
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Client Management */}
         <Collapsible open={openSection === 'clients'} onOpenChange={() => toggleSection('clients')}>
