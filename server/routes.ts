@@ -256,7 +256,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/registrations", requireAdmin, async (req, res) => {
     try {
       const registrations = await storage.getRegistrations();
-      res.json({ success: true, registrations });
+      
+      // Enrich registration data with discount code information
+      const enrichedRegistrations = await Promise.all(
+        registrations.map(async (registration) => {
+          let discountCode = null;
+          if (registration.discountCodeId) {
+            const discountCodes = await storage.getDiscountCodes();
+            discountCode = discountCodes.find(dc => dc.id === registration.discountCodeId);
+          }
+          
+          return {
+            ...registration,
+            discountCode: discountCode ? {
+              code: discountCode.code, // This will be in ABCD-EFGH format
+              description: discountCode.description
+            } : null
+          };
+        })
+      );
+      
+      res.json({ success: true, registrations: enrichedRegistrations });
     } catch (error) {
       console.error("Get registrations error:", error);
       res.status(500).json({ error: "Internal server error" });
