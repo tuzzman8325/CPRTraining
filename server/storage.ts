@@ -79,9 +79,13 @@ export class MemStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    if (!userData.id) {
+      throw new Error("User ID is required");
+    }
     const existingUser = this.users.get(userData.id);
     const user: User = {
       ...userData,
+      id: userData.id,
       role: userData.role || "user",
       createdAt: existingUser?.createdAt || new Date(),
       updatedAt: new Date(),
