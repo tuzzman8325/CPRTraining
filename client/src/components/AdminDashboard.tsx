@@ -208,7 +208,8 @@ export default function AdminDashboard() {
 
   // React Query hooks for registrations  
   const { data: registrationsData, isLoading: registrationsLoading, refetch: refetchRegistrations } = useQuery<RegistrationsResponse>({
-    queryKey: ['/api/registrations', 'v3'], // Change version to force refresh
+    queryKey: ['/api/registrations'],
+    queryFn: () => fetch('/api/registrations?' + Date.now()).then(res => res.json()),
     staleTime: 0, // Force fresh fetch
     gcTime: 0, // Don't cache during development (React Query v5)
   });

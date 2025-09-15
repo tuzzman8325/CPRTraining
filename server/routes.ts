@@ -62,15 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shared utility for enriching registrations with discount code data
   async function enrichRegistrationsWithDiscountCodes(registrations: any[]) {
     try {
-      console.log('DEBUG: Starting enrichment process...');
       const discountCodes = await storage.getDiscountCodes();
-      
-      console.log('DEBUG: Enriching registrations...', {
-        registrationCount: registrations.length,
-        discountCodeCount: discountCodes.length,
-        sampleRegistration: registrations[0],
-        availableDiscountCodes: discountCodes.map(dc => ({ id: dc.id, code: dc.code }))
-      });
       
       // Create maps for fast lookup by both id and code
       const discountCodesByCodeId = new Map();
@@ -87,13 +79,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Try to find discount code by discountCodeId first
         if (registration.discountCodeId) {
           discountCode = discountCodesByCodeId.get(registration.discountCodeId);
-          console.log('DEBUG: Looking up by discountCodeId:', registration.discountCodeId, 'found:', !!discountCode);
         }
         
         // If not found by ID, try by code string (for backward compatibility)
         if (!discountCode && registration.discountCode) {
           discountCode = discountCodesByCode.get(registration.discountCode);
-          console.log('DEBUG: Looking up by discountCode string:', registration.discountCode, 'found:', !!discountCode);
         }
         
         // Handle historical data: If no discount code found but registration has characteristics of discount code usage
@@ -103,7 +93,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             code: 'DISCOUNT-USED',
             description: 'Discount code applied (legacy)'
           };
-          console.log('DEBUG: Using generic discount code for legacy registration:', registration.id);
         }
         
         const result = {
@@ -114,12 +103,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } : null
         };
         
-        console.log('DEBUG: Registration enrichment result:', {
-          id: registration.id,
-          originalDiscountCodeId: registration.discountCodeId,
-          originalDiscountCode: registration.discountCode,
-          enrichedDiscountCode: result.discountCode
-        });
         
         return result;
       });
