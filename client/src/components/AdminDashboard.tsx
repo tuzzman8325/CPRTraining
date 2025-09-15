@@ -1730,7 +1730,13 @@ export default function AdminDashboard() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {registration.amountPaid ? `$${(registration.amountPaid / 100).toFixed(2)}` : 'N/A'}
+                              {(registration as any).discountCode ? (
+                                `Discount Code: ${(registration as any).discountCode.code}`
+                              ) : registration.amountPaid ? (
+                                `$${(registration.amountPaid / 100).toFixed(2)}`
+                              ) : (
+                                'N/A'
+                              )}
                             </TableCell>
                             <TableCell>{registration.registrationDate}</TableCell>
                             <TableCell>
