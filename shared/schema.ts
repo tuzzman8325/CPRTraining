@@ -95,6 +95,7 @@ export const upsertUserSchema = createInsertSchema(users).pick({
   firstName: true,
   lastName: true,
   profileImageUrl: true,
+  role: true,
 });
 
 export const insertClassSchema = createInsertSchema(classes).omit({

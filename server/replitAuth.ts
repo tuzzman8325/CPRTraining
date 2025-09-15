@@ -57,11 +57,11 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  // Check if this is an admin user (you can modify this logic as needed)
-  const isAdmin = claims["email"] === "admin@example.com" || 
-                 claims["sub"] === "admin" ||
-                 // Add your specific admin identification logic here
-                 false;
+  // Get existing user to preserve their role
+  const existingUser = await storage.getUser(claims["sub"]);
+  
+  // Only set role for new users, preserve existing roles
+  const role = existingUser?.role || "user";
 
   await storage.upsertUser({
     id: claims["sub"],
@@ -69,7 +69,7 @@ async function upsertUser(
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-    role: isAdmin ? "admin" : "user",
+    role: role,
   });
 }
 
