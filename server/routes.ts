@@ -61,38 +61,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Shared utility for enriching registrations with discount code data
   async function enrichRegistrationsWithDiscountCodes(registrations: any[]) {
-    const discountCodes = await storage.getDiscountCodes();
-    
-    // Create maps for fast lookup by both id and code
-    const discountCodesByCodeId = new Map();
-    const discountCodesByCode = new Map();
-    
-    discountCodes.forEach(dc => {
-      discountCodesByCodeId.set(dc.id, dc);
-      discountCodesByCode.set(dc.code, dc);
-    });
-    
-    return registrations.map(registration => {
-      let discountCode = null;
+    try {
+      console.log('DEBUG: Starting enrichment process...');
+      const discountCodes = await storage.getDiscountCodes();
       
-      // Try to find discount code by discountCodeId first
-      if (registration.discountCodeId) {
-        discountCode = discountCodesByCodeId.get(registration.discountCodeId);
-      }
+      console.log('DEBUG: Enriching registrations...', {
+        registrationCount: registrations.length,
+        discountCodeCount: discountCodes.length,
+        sampleRegistration: registrations[0],
+        availableDiscountCodes: discountCodes.map(dc => ({ id: dc.id, code: dc.code }))
+      });
       
-      // If not found by ID, try by code string (for backward compatibility)
-      if (!discountCode && registration.discountCode) {
-        discountCode = discountCodesByCode.get(registration.discountCode);
-      }
+      // Create maps for fast lookup by both id and code
+      const discountCodesByCodeId = new Map();
+      const discountCodesByCode = new Map();
       
-      return {
-        ...registration,
-        discountCode: discountCode ? {
-          code: discountCode.code,
-          description: discountCode.description
-        } : null
-      };
-    });
+      discountCodes.forEach(dc => {
+        discountCodesByCodeId.set(dc.id, dc);
+        discountCodesByCode.set(dc.code, dc);
+      });
+      
+      return registrations.map(registration => {
+        let discountCode = null;
+        
+        // Try to find discount code by discountCodeId first
+        if (registration.discountCodeId) {
+          discountCode = discountCodesByCodeId.get(registration.discountCodeId);
+          console.log('DEBUG: Looking up by discountCodeId:', registration.discountCodeId, 'found:', !!discountCode);
+        }
+        
+        // If not found by ID, try by code string (for backward compatibility)
+        if (!discountCode && registration.discountCode) {
+          discountCode = discountCodesByCode.get(registration.discountCode);
+          console.log('DEBUG: Looking up by discountCode string:', registration.discountCode, 'found:', !!discountCode);
+        }
+        
+        // Handle historical data: If no discount code found but registration has characteristics of discount code usage
+        // (confirmed status with null payment info), show a generic discount code indicator
+        if (!discountCode && registration.status === 'confirmed' && (!registration.amountPaid && !registration.paymentIntentId)) {
+          discountCode = {
+            code: 'DISCOUNT-USED',
+            description: 'Discount code applied (legacy)'
+          };
+          console.log('DEBUG: Using generic discount code for legacy registration:', registration.id);
+        }
+        
+        const result = {
+          ...registration,
+          discountCode: discountCode ? {
+            code: discountCode.code,
+            description: discountCode.description
+          } : null
+        };
+        
+        console.log('DEBUG: Registration enrichment result:', {
+          id: registration.id,
+          originalDiscountCodeId: registration.discountCodeId,
+          originalDiscountCode: registration.discountCode,
+          enrichedDiscountCode: result.discountCode
+        });
+        
+        return result;
+      });
+    } catch (error) {
+      console.error('ERROR in enrichment function:', error);
+      // Return original registrations if enrichment fails
+      return registrations;
+    }
   }
 
   // User management routes (admin only)
@@ -389,6 +424,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         client = await storage.createClient(newClientData);
         console.log("New client created:", client.id);
+      }
+
+      // Handle discount code processing if provided
+      if (registrationData.discountCodeId) {
+        console.log("Processing discount code:", registrationData.discountCodeId);
+        
+        // Validate discount code
+        const discountCodes = await storage.getDiscountCodes();
+        const discountCode = discountCodes.find(dc => dc.id === registrationData.discountCodeId);
+        if (!discountCode || !discountCode.isActive) {
+          return res.status(400).json({ error: "Invalid or inactive discount code" });
+        }
+        
+        // Check if discount code has reached usage limit
+        if (discountCode.maxUses && discountCode.usedCount >= discountCode.maxUses) {
+          return res.status(400).json({ error: "Discount code usage limit reached" });
+        }
+        
+        // Check if discount code has expired
+        if (discountCode.expiresAt && new Date(discountCode.expiresAt) < new Date()) {
+          return res.status(400).json({ error: "Discount code has expired" });
+        }
+        
+        console.log("Discount code validated successfully");
+        
+        // Set payment-related fields for free registration
+        registrationData.paymentIntentId = null;
+        registrationData.amountPaid = null;
+        registrationData.status = 'confirmed';
       }
 
       console.log("Creating registration...");
