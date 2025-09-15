@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Class, type InsertClass, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode, type Client, type InsertClient } from "@shared/schema";
+import { type User, type InsertUser, type UpsertUser, type Class, type InsertClass, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode, type Client, type InsertClient } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { users, classes, registrations, discountCodes, clients } from "@shared/schema";
@@ -8,7 +8,11 @@ import { eq, sql, and, lt } from "drizzle-orm";
 // you might need
 
 export interface IStorage {
+  // Replit Auth user operations
   getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  
+  // Legacy user operations (for backward compatibility)
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
@@ -74,9 +78,21 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const existingUser = this.users.get(userData.id);
+    const user: User = {
+      ...userData,
+      role: userData.role || "user",
+      createdAt: existingUser?.createdAt || new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(userData.id, user);
+    return user;
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.email === username, // Changed to search by email since username field is removed
     );
   }
 
@@ -85,7 +101,13 @@ export class MemStorage implements IStorage {
     const user: User = { 
       ...insertUser, 
       id,
-      email: insertUser.email || null
+      email: insertUser.email || null,
+      firstName: insertUser.firstName || null,
+      lastName: insertUser.lastName || null,
+      profileImageUrl: insertUser.profileImageUrl || null,
+      role: insertUser.role || "user",
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     this.users.set(id, user);
     return user;
@@ -389,8 +411,28 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const result = await db
+      .insert(users)
+      .values({
+        ...userData,
+        role: userData.role || "user",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return result[0];
+  }
+
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.username, username));
+    const result = await db.select().from(users).where(eq(users.email, username));
     return result[0];
   }
 

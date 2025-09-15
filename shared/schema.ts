@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, date, integer, pgEnum, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, date, integer, pgEnum, timestamp, boolean, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -7,11 +7,27 @@ export const classTypeEnum = pgEnum("class_type", ["BLS", "Heartsaver"]);
 export const registrationStatusEnum = pgEnum("registration_status", ["pending", "confirmed", "cancelled"]);
 export const clientStatusEnum = pgEnum("client_status", ["active", "update", "expired"]);
 
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// Updated users table for Replit Auth compatibility
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  email: text("email"),
-  password: text("password").notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  role: varchar("role").notNull().default("user"), // user or admin
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const classes = pgTable("classes", {
@@ -67,10 +83,18 @@ export const clients = pgTable("clients", {
   updatedAt: timestamp("updated_at").notNull().default(sql`NOW()`),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
+// Replit Auth user schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const upsertUserSchema = createInsertSchema(users).pick({
+  id: true,
   email: true,
-  password: true,
+  firstName: true,
+  lastName: true,
+  profileImageUrl: true,
 });
 
 export const insertClassSchema = createInsertSchema(classes).omit({
@@ -104,6 +128,7 @@ export const insertClientSchema = createInsertSchema(clients).omit({
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 export type InsertClass = z.infer<typeof insertClassSchema>;

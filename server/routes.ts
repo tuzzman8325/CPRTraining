@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
-import { insertUserSchema, insertClassSchema, insertRegistrationSchema, insertDiscountCodeSchema, insertClientSchema } from "@shared/schema";
+import { insertClassSchema, insertRegistrationSchema, insertDiscountCodeSchema, insertClientSchema } from "@shared/schema";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 // Use testing keys in development, live keys in production
 const stripeSecretKey = process.env.NODE_ENV === 'development' 
@@ -19,62 +20,44 @@ const stripe = new Stripe(stripeSecretKey, {
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication routes
-  app.post("/api/auth/login", async (req, res) => {
+  // Set up Replit Auth middleware
+  await setupAuth(app);
+
+  // Replit Auth user endpoint
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const { username, password } = req.body;
-      
-      if (!username || !password) {
-        return res.status(400).json({ error: "Username and password required" });
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
       }
-
-      // Check for admin credentials
-      if (username === "admin" && password === "admin123") {
-        return res.json({ 
-          success: true, 
-          user: { username: "admin", role: "admin" },
-          message: "Admin login successful"
-        });
-      }
-
-      // Try to find user in storage
-      const user = await storage.getUserByUsername(username);
-      if (!user || user.password !== password) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-
-      res.json({ 
-        success: true, 
-        user: { username: user.username, role: "user" },
-        message: "Login successful"
-      });
+      res.json(user);
     } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ error: "Internal server error" });
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 
-  app.post("/api/auth/register", async (req, res) => {
+  // Admin-only routes middleware
+  const requireAdmin = async (req: any, res: any, next: any) => {
     try {
-      const userData = insertUserSchema.parse(req.body);
-      
-      // Check if user already exists
-      const existingUser = await storage.getUserByUsername(userData.username);
-      if (existingUser) {
-        return res.status(409).json({ error: "Username already exists" });
+      if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+        return res.status(401).json({ message: "Authentication required" });
       }
-
-      const user = await storage.createUser(userData);
-      res.json({ 
-        success: true, 
-        user: { username: user.username, role: "user" },
-        message: "Registration successful"
-      });
+      
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      next();
     } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ error: "Internal server error" });
+      console.error("Admin check error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
-  });
+  };
 
   // Class management routes
   app.get("/api/classes", async (req, res) => {
@@ -105,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/classes", async (req, res) => {
+  app.post("/api/classes", requireAdmin, async (req, res) => {
     try {
       const classData = insertClassSchema.parse(req.body);
       const newClass = await storage.createClass(classData);
@@ -124,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/classes/:id", async (req, res) => {
+  app.put("/api/classes/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const updates = insertClassSchema.partial().parse(req.body);
@@ -149,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/classes/:id", async (req, res) => {
+  app.delete("/api/classes/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await storage.deleteClass(id);
@@ -183,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Registration routes
-  app.get("/api/registrations", async (req, res) => {
+  app.get("/api/registrations", requireAdmin, async (req, res) => {
     try {
       const registrations = await storage.getRegistrations();
       res.json({ success: true, registrations });
@@ -300,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/registrations/:id", async (req, res) => {
+  app.put("/api/registrations/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const updates = insertRegistrationSchema.partial().parse(req.body);
@@ -325,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/registrations/:id", async (req, res) => {
+  app.delete("/api/registrations/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteRegistration(id);
@@ -344,8 +327,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Discount Code routes
-  app.get("/api/discount-codes", async (req, res) => {
+  // Discount Code routes (Admin only)
+  app.get("/api/discount-codes", requireAdmin, async (req, res) => {
     try {
       const discountCodes = await storage.getDiscountCodes();
       res.json({ success: true, discountCodes });
@@ -355,7 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/discount-codes", async (req, res) => {
+  app.post("/api/discount-codes", requireAdmin, async (req, res) => {
     try {
       const discountCodeData = insertDiscountCodeSchema.parse(req.body);
       
@@ -425,7 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/discount-codes/:id", async (req, res) => {
+  app.put("/api/discount-codes/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const updates = insertDiscountCodeSchema.partial().parse(req.body);
@@ -450,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/discount-codes/:id", async (req, res) => {
+  app.delete("/api/discount-codes/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteDiscountCode(id);
@@ -496,8 +479,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Client Management routes (for testing and admin purposes)
-  app.get("/api/clients", async (req, res) => {
+  // Client Management routes (Admin only)
+  app.get("/api/clients", requireAdmin, async (req, res) => {
     try {
       const clients = await storage.getClients();
       res.json({ success: true, clients });
@@ -507,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clients/:id", async (req, res) => {
+  app.get("/api/clients/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const client = await storage.getClientById(id);
@@ -523,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clients/email/:email", async (req, res) => {
+  app.get("/api/clients/email/:email", requireAdmin, async (req, res) => {
     try {
       const { email } = req.params;
       const client = await storage.getClientByEmail(decodeURIComponent(email));

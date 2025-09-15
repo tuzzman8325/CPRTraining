@@ -11,13 +11,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen, Settings, LogOut, Shield } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import ekgLogo from '@assets/generated_images/EKG_line_logo_7cbd6728.png?url';
 
 export default function Header() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin } = useAuth();
   const [, setLocation] = useLocation();
 
   const navItems = [
@@ -27,8 +27,7 @@ export default function Header() {
   ];
 
   const handleLogout = () => {
-    logout();
-    setLocation('/');
+    window.location.href = '/api/logout';
   };
 
   const isActive = (href: string) => location === href;
@@ -72,7 +71,7 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="flex items-center space-x-2" data-testid="button-user-menu">
                     <User className="h-4 w-4" />
-                    <span>{user?.username}</span>
+                    <span>{user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user?.email}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
