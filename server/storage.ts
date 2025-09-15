@@ -16,6 +16,10 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
+  // User management operations
+  getAllUsers(): Promise<User[]>;
+  updateUserRole(id: string, role: "user" | "admin"): Promise<User | undefined>;
+  
   // Class CRUD operations
   getClasses(): Promise<Class[]>;
   getClassById(id: string): Promise<Class | undefined>;
@@ -115,6 +119,26 @@ export class MemStorage implements IStorage {
     };
     this.users.set(id, user);
     return user;
+  }
+
+  // User management operations
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async updateUserRole(id: string, role: "user" | "admin"): Promise<User | undefined> {
+    const existingUser = this.users.get(id);
+    if (!existingUser) {
+      return undefined;
+    }
+    
+    const updatedUser: User = {
+      ...existingUser,
+      role: role,
+      updatedAt: new Date(),
+    };
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
 
   // Class CRUD operations
@@ -446,6 +470,21 @@ export class DbStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  // User management operations
+  async getAllUsers(): Promise<User[]> {
+    const result = await db.select().from(users);
+    return result;
+  }
+
+  async updateUserRole(id: string, role: "user" | "admin"): Promise<User | undefined> {
+    const result = await db
+      .update(users)
+      .set({ role: role, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
     return result[0];
   }
 

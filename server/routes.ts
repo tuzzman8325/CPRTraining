@@ -59,6 +59,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  // User management routes (admin only)
+  app.get("/api/users", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json({ success: true, users });
+    } catch (error) {
+      console.error("Get users error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/users/:id/role", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+      
+      if (!role || (role !== "user" && role !== "admin")) {
+        return res.status(400).json({ error: "Invalid role. Must be 'user' or 'admin'" });
+      }
+      
+      const updatedUser = await storage.updateUserRole(id, role);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({ 
+        success: true, 
+        user: updatedUser,
+        message: `User role updated to ${role}` 
+      });
+    } catch (error) {
+      console.error("Update user role error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Class management routes
   app.get("/api/classes", async (req, res) => {
     try {
