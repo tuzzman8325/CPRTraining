@@ -88,8 +88,11 @@ export class MemStorage implements IStorage {
     }
     const existingUser = this.users.get(userData.id);
     const user: User = {
-      ...userData,
       id: userData.id,
+      email: userData.email ?? null,
+      firstName: userData.firstName ?? null,
+      lastName: userData.lastName ?? null,
+      profileImageUrl: userData.profileImageUrl ?? null,
       role: userData.role || "user",
       createdAt: existingUser?.createdAt || new Date(),
       updatedAt: new Date(),

@@ -74,9 +74,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { role } = req.body;
+      const currentUserId = (req.user as any)?.claims?.sub;
       
       if (!role || (role !== "user" && role !== "admin")) {
         return res.status(400).json({ error: "Invalid role. Must be 'user' or 'admin'" });
+      }
+      
+      // Prevent self-demotion to avoid admin lockout
+      if (currentUserId === id && role === "user") {
+        return res.status(400).json({ 
+          error: "You cannot demote your own account to prevent admin lockout. Another admin must perform this action." 
+        });
       }
       
       const updatedUser = await storage.updateUserRole(id, role);
@@ -385,12 +393,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : `${discountCodeData.expiresAt}T23:59:59.999Z`;
       
       // Ensure admin user exists, then assign createdBy
-      let adminUser = await storage.getUserByUsername('admin');
+      let adminUser = await storage.getUserByUsername('admin@system.local');
       if (!adminUser) {
         adminUser = await storage.createUser({
-          username: 'admin',
           email: 'admin@system.local',
-          password: 'admin_system_user'
+          firstName: 'System',
+          lastName: 'Admin',
+          role: 'admin'
         });
       }
       

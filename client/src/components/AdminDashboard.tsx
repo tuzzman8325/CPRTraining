@@ -130,6 +130,11 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 
 export default function AdminDashboard() {
@@ -1040,24 +1045,32 @@ export default function AdminDashboard() {
                                       Promote to Admin
                                     </Button>
                                   ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        if (isCurrentUser) {
-                                          const confirmed = window.confirm(
-                                            'Warning: You are about to demote yourself from admin. This will remove your admin privileges. Are you sure you want to continue?'
-                                          );
-                                          if (!confirmed) return;
-                                        }
-                                        updateUserRoleMutation.mutate({ id: user.id, role: 'user' });
-                                      }}
-                                      disabled={updateUserRoleMutation.isPending}
-                                      data-testid={`button-demote-${user.id}`}
-                                      className={isCurrentUser ? 'border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground' : ''}
-                                    >
-                                      {isCurrentUser ? 'Demote Yourself' : 'Demote to User'}
-                                    </Button>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                              if (canDemote) {
+                                                updateUserRoleMutation.mutate({ id: user.id, role: 'user' });
+                                              }
+                                            }}
+                                            disabled={updateUserRoleMutation.isPending}
+                                            aria-disabled={!canDemote}
+                                            data-testid={`button-demote-${user.id}`}
+                                            className={!canDemote ? 'opacity-50 cursor-not-allowed' : ''}
+                                          >
+                                            Demote to User
+                                          </Button>
+                                        </span>
+                                      </TooltipTrigger>
+                                      {!canDemote && (
+                                        <TooltipContent>
+                                          <p>You cannot demote your own account to prevent admin lockout</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
                                   )}
                                 </div>
                               </TableCell>
