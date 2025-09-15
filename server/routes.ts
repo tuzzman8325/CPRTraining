@@ -104,6 +104,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentUserId = (req.user as any)?.claims?.sub;
+      
+      // Prevent self-deletion to avoid admin lockout
+      if (currentUserId === id) {
+        return res.status(400).json({ 
+          error: "You cannot delete your own account to prevent admin lockout. Another admin must perform this action." 
+        });
+      }
+      
+      const result = await storage.deleteUser(id);
+      
+      if (!result.success) {
+        if (result.error) {
+          // Return specific constraint error with appropriate status code
+          const statusCode = result.registrationCount && result.registrationCount > 0 ? 409 : 404;
+          return res.status(statusCode).json({ 
+            error: result.error,
+            registrationCount: result.registrationCount 
+          });
+        }
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({ 
+        success: true,
+        message: "User deleted successfully"
+      });
+    } catch (error) {
+      console.error("Delete user error:", error);
+      // Handle any uncaught foreign key constraint errors
+      if (error instanceof Error && error.message.includes('foreign key constraint')) {
+        return res.status(409).json({ 
+          error: "Cannot delete user due to existing data dependencies. Please remove all related data first." 
+        });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Class management routes
   app.get("/api/classes", async (req, res) => {
     try {

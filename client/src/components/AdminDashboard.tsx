@@ -182,6 +182,8 @@ export default function AdminDashboard() {
 
   // User Management state
   const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [selectedUserForDeletion, setSelectedUserForDeletion] = useState<User | null>(null);
+  const [isDeleteUserDialogOpen, setIsDeleteUserDialogOpen] = useState(false);
 
   // Roster state
   const [isGeneratingRoster, setIsGeneratingRoster] = useState(false);
@@ -403,6 +405,47 @@ export default function AdminDashboard() {
       
       toast({ 
         title: "Error", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
+    }
+  });
+
+  // User delete mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/users/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      setIsDeleteUserDialogOpen(false);
+      setSelectedUserForDeletion(null);
+      toast({ title: "Success", description: "User deleted successfully" });
+    },
+    onError: (error: any) => {
+      let errorMessage = "Failed to delete user";
+      
+      // Handle specific constraint errors from the backend
+      if (error.response?.status === 409) {
+        // Conflict status indicates constraint violation
+        const errorData = error.response.data;
+        if (errorData.registrationCount) {
+          errorMessage = `Cannot delete user - ${errorData.registrationCount} registration${errorData.registrationCount > 1 ? 's exist' : ' exists'}. Please cancel all registrations first.`;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else {
+          errorMessage = "Cannot delete user due to existing registrations. Please cancel all registrations first.";
+        }
+      } else if (error.response?.data?.error) {
+        // Use specific error message from backend
+        errorMessage = error.response.data.error;
+      } else {
+        // Fallback to generic error message
+        errorMessage = `Failed to delete user: ${error.message}`;
+      }
+      
+      toast({ 
+        title: "Cannot Delete User", 
         description: errorMessage, 
         variant: "destructive" 
       });
@@ -1072,6 +1115,33 @@ export default function AdminDashboard() {
                                       )}
                                     </Tooltip>
                                   )}
+                                  
+                                  {/* Delete User Button */}
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span>
+                                        <Button
+                                          size="sm"
+                                          variant={isCurrentUser ? "outline" : "destructive"}
+                                          onClick={() => {
+                                            if (!isCurrentUser) {
+                                              setSelectedUserForDeletion(user);
+                                              setIsDeleteUserDialogOpen(true);
+                                            }
+                                          }}
+                                          disabled={deleteUserMutation.isPending || isCurrentUser}
+                                          aria-disabled={isCurrentUser}
+                                          data-testid={`button-delete-${user.id}`}
+                                          className={isCurrentUser ? 'opacity-50 cursor-not-allowed' : ''}
+                                        >
+                                          <Trash className="h-4 w-4" />
+                                        </Button>
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{isCurrentUser ? 'You cannot delete your own account to prevent admin lockout' : 'Delete user account'}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -3008,6 +3078,48 @@ export default function AdminDashboard() {
                 </DialogFooter>
               </form>
             </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete User Confirmation Dialog */}
+        <Dialog open={isDeleteUserDialogOpen} onOpenChange={setIsDeleteUserDialogOpen}>
+          <DialogContent data-testid="dialog-delete-user-confirmation">
+            <DialogHeader>
+              <DialogTitle>Delete User Account</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete {selectedUserForDeletion?.firstName && selectedUserForDeletion?.lastName 
+                  ? `${selectedUserForDeletion.firstName} ${selectedUserForDeletion.lastName}'s` 
+                  : selectedUserForDeletion?.email || 'this user\'s'} account?
+                <br />
+                <strong>This action cannot be undone.</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button 
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteUserDialogOpen(false);
+                  setSelectedUserForDeletion(null);
+                }}
+                data-testid="button-cancel-delete-user"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  if (selectedUserForDeletion?.id) {
+                    deleteUserMutation.mutate(selectedUserForDeletion.id);
+                  }
+                }}
+                disabled={deleteUserMutation.isPending}
+                data-testid="button-confirm-delete-user"
+              >
+                {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

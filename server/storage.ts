@@ -19,6 +19,7 @@ export interface IStorage {
   // User management operations
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: string, role: "user" | "admin"): Promise<User | undefined>;
+  deleteUser(id: string): Promise<{ success: boolean; error?: string; registrationCount?: number }>;
   
   // Class CRUD operations
   getClasses(): Promise<Class[]>;
@@ -142,6 +143,28 @@ export class MemStorage implements IStorage {
     };
     this.users.set(id, updatedUser);
     return updatedUser;
+  }
+
+  async deleteUser(id: string): Promise<{ success: boolean; error?: string; registrationCount?: number }> {
+    // Check if user exists
+    const user = this.users.get(id);
+    if (!user) {
+      return { success: false, error: "User not found" };
+    }
+    
+    // Check for existing registrations first
+    const registrations = await this.getRegistrationsByUser(id);
+    
+    if (registrations.length > 0) {
+      return {
+        success: false,
+        error: `Cannot delete user - ${registrations.length} registration${registrations.length > 1 ? 's exist' : ' exists'}. Please cancel all registrations first.`,
+        registrationCount: registrations.length
+      };
+    }
+    
+    const deleted = this.users.delete(id);
+    return { success: deleted };
   }
 
   // Class CRUD operations
@@ -489,6 +512,39 @@ export class DbStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return result[0];
+  }
+
+  async deleteUser(id: string): Promise<{ success: boolean; error?: string; registrationCount?: number }> {
+    try {
+      // Check if user exists
+      const user = await this.getUser(id);
+      if (!user) {
+        return { success: false, error: "User not found" };
+      }
+      
+      // Check for existing registrations first
+      const registrations = await this.getRegistrationsByUser(id);
+      
+      if (registrations.length > 0) {
+        return {
+          success: false,
+          error: `Cannot delete user - ${registrations.length} registration${registrations.length > 1 ? 's exist' : ' exists'}. Please cancel all registrations first.`,
+          registrationCount: registrations.length
+        };
+      }
+      
+      const result = await db.delete(users).where(eq(users.id, id));
+      return { success: (result.rowCount ?? 0) > 0 };
+    } catch (error) {
+      // Handle potential foreign key constraint errors
+      if (error instanceof Error && error.message.includes('foreign key constraint')) {
+        return {
+          success: false,
+          error: "Cannot delete user due to existing data dependencies. Please remove all related data first."
+        };
+      }
+      throw error; // Re-throw other errors
+    }
   }
 
   // Class CRUD operations
