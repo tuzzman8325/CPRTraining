@@ -2026,7 +2026,7 @@ export default function AdminDashboard() {
                       <div>
                         <span className="text-sm font-medium text-muted-foreground">Discount Codes Used:</span>
                         <p className="font-medium">
-                          {classDetailsData.registrations.filter(r => r.discountCodeId).length} students
+                          {classDetailsData.registrations.filter(r => (r as any).discountCode).length} students
                         </p>
                       </div>
                       <div>
@@ -2079,7 +2079,7 @@ export default function AdminDashboard() {
                                     <div className="flex justify-between">
                                       <span className="text-muted-foreground">Payment:</span>
                                       <span className="font-medium">
-                                        {registration.discountCodeId 
+                                        {(registration as any).discountCode 
                                           ? `Discount Applied`
                                           : registration.paymentIntentId 
                                             ? `$${((registration.amountPaid || 0) / 100).toFixed(2)}`
@@ -2091,13 +2091,13 @@ export default function AdminDashboard() {
                                       <span className="text-muted-foreground">Status:</span>
                                       <Badge 
                                         variant={
-                                          registration.paymentIntentId || registration.discountCodeId 
+                                          registration.paymentIntentId || (registration as any).discountCode 
                                             ? 'default' 
                                             : 'secondary'
                                         }
                                         className="text-xs"
                                       >
-                                        {registration.paymentIntentId || registration.discountCodeId ? 'Confirmed' : 'Pending'}
+                                        {registration.paymentIntentId || (registration as any).discountCode ? 'Confirmed' : 'Pending'}
                                       </Badge>
                                     </div>
                                   </div>
@@ -2131,10 +2131,10 @@ export default function AdminDashboard() {
                                     <TableCell>{registration.email}</TableCell>
                                     <TableCell>{registration.phone || 'N/A'}</TableCell>
                                     <TableCell>
-                                      {registration.discountCodeId ? (
+                                      {(registration as any).discountCode ? (
                                         <div className="flex items-center gap-2">
                                           <Ticket className="h-4 w-4" />
-                                          <span>Discount Applied</span>
+                                          <span>Discount Code: {(registration as any).discountCode.code}</span>
                                         </div>
                                       ) : registration.paymentIntentId ? (
                                         <div className="flex items-center gap-2">
@@ -2148,12 +2148,12 @@ export default function AdminDashboard() {
                                     <TableCell>
                                       <Badge 
                                         variant={
-                                          registration.paymentIntentId || registration.discountCodeId 
+                                          registration.paymentIntentId || (registration as any).discountCode 
                                             ? 'default' 
                                             : 'secondary'
                                         }
                                       >
-                                        {registration.paymentIntentId || registration.discountCodeId ? 'Confirmed' : 'Pending'}
+                                        {registration.paymentIntentId || (registration as any).discountCode ? 'Confirmed' : 'Pending'}
                                       </Badge>
                                     </TableCell>
                                   </TableRow>
