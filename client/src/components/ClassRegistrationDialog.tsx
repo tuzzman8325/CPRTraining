@@ -9,7 +9,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { parseLocalDate } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { Class } from '@shared/schema';
 
@@ -486,10 +487,10 @@ export default function ClassRegistrationDialog({ isOpen, onClose, classData }: 
     setShowDiscountForm(false);
   };
 
-  const handleSuccess = () => {
+  const handleSuccess = async () => {
     handleClose();
     // Trigger a refresh of class data to update availability
-    window.location.reload();
+    await queryClient.invalidateQueries({ queryKey: ['/api/classes'] });
   };
 
   if (!classData) return null;
@@ -500,7 +501,7 @@ export default function ClassRegistrationDialog({ isOpen, onClose, classData }: 
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-xl">Register for {classData.title}</DialogTitle>
           <div className="text-sm text-muted-foreground mt-2">
-            <p><strong>Date:</strong> {new Date(classData.date).toLocaleDateString()}</p>
+            <p><strong>Date:</strong> {parseLocalDate(classData.date).toLocaleDateString()}</p>
             <p><strong>Time:</strong> {classData.time}</p>
             <p><strong>Duration:</strong> {classData.duration}</p>
             <p><strong>Price:</strong> ${classData.price}</p>

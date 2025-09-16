@@ -1,12 +1,14 @@
+import { useState } from 'react';
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
 import ClassCard from '@/components/ClassCard';
+import ClassRegistrationDialog from '@/components/ClassRegistrationDialog';
 import InstructorProfile from '@/components/InstructorProfile';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, Calendar as CalendarIcon, BookOpen, Phone, Mail } from 'lucide-react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Class } from '@shared/schema';
 import { format } from 'date-fns';
@@ -15,6 +17,11 @@ import blsImage from '@assets/generated_images/BLS_provider_training_a0cd6457.pn
 import heartsaverImage from '@assets/generated_images/Heartsaver_community_training_b3867bec.png';
 
 export default function Home() {
+  // Registration dialog state
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  const [, setLocation] = useLocation();
+
   // Fetch classes data
   const { data: classesResponse, isLoading } = useQuery<{ success: boolean; classes: Class[] }>({
     queryKey: ['/api/classes'],
@@ -43,13 +50,26 @@ export default function Home() {
   const nextHeartsaverClass = getNextClass('Heartsaver');
 
   const handleClassRegister = (type: string) => {
-    console.log(`Register for ${type} class`);
-    // TODO: Implement registration flow
+    // Find the next available class of the selected type
+    const targetClass = type === 'BLS' ? nextBLSClass : nextHeartsaverClass;
+    
+    if (targetClass && targetClass.available > 0) {
+      setSelectedClass(targetClass);
+      setIsRegistrationOpen(true);
+    } else {
+      // Navigate to classes page if no available class found
+      setLocation('/classes');
+    }
   };
 
   const handleClassLearnMore = (type: string) => {
-    console.log(`Learn more about ${type} class`);
-    // TODO: Navigate to class details
+    // Navigate to the detailed classes page
+    setLocation('/classes');
+  };
+
+  const handleRegistrationClose = () => {
+    setIsRegistrationOpen(false);
+    setSelectedClass(null);
   };
 
   // Loading state component
@@ -215,6 +235,13 @@ export default function Home() {
       </section>
 
       <Footer />
+      
+      {/* Registration Dialog */}
+      <ClassRegistrationDialog
+        isOpen={isRegistrationOpen}
+        onClose={handleRegistrationClose}
+        classData={selectedClass}
+      />
     </div>
   );
 }
