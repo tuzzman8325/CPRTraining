@@ -1,13 +1,56 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Phone, Mail, MapPin, Clock, Download, Heart } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, Download, Heart, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { PDFService, fetchClassesForPDF } from '@/lib/pdfService';
 import ahaBadge from '@assets/generated_images/AHA_certification_badge_22dd9294.png';
 
 export default function Footer() {
-  const handleDownloadFlyer = (type: string) => {
-    console.log(`Download ${type} flyer`);
-    // TODO: Implement flyer download functionality
+  const [isDownloading, setIsDownloading] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const handleDownloadFlyer = async (type: string) => {
+    setIsDownloading(type);
+    
+    try {
+      // Fetch the latest classes data
+      const classes = await fetchClassesForPDF();
+      
+      let result;
+      switch (type) {
+        case 'bls':
+          result = await PDFService.downloadBLSFlyer(classes);
+          break;
+        case 'heartsaver':
+          result = await PDFService.downloadHeartsaverFlyer(classes);
+          break;
+        case 'schedule':
+          result = await PDFService.downloadClassSchedule(classes);
+          break;
+        default:
+          throw new Error('Invalid flyer type');
+      }
+      
+      if (result.success) {
+        toast({
+          title: 'Download Started',
+          description: `${type.charAt(0).toUpperCase() + type.slice(1)} flyer is being downloaded.`,
+        });
+      } else {
+        throw new Error(result.error || 'Failed to generate PDF');
+      }
+    } catch (error) {
+      console.error(`Error downloading ${type} flyer:`, error);
+      toast({
+        title: 'Download Failed',
+        description: `Failed to download ${type} flyer. Please try again.`,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloading(null);
+    }
   };
 
   const handleContactClick = (method: string) => {
@@ -112,33 +155,48 @@ export default function Footer() {
                 variant="outline" 
                 size="sm" 
                 onClick={() => handleDownloadFlyer('bls')}
+                disabled={isDownloading === 'bls'}
                 className="w-full justify-start"
                 data-testid="button-download-bls"
               >
-                <Download className="h-4 w-4 mr-2" />
-                BLS Course Flyer
+                {isDownloading === 'bls' ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {isDownloading === 'bls' ? 'Generating...' : 'BLS Course Flyer'}
               </Button>
               
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={() => handleDownloadFlyer('heartsaver')}
+                disabled={isDownloading === 'heartsaver'}
                 className="w-full justify-start"
                 data-testid="button-download-heartsaver"
               >
-                <Download className="h-4 w-4 mr-2" />
-                Heartsaver Flyer
+                {isDownloading === 'heartsaver' ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {isDownloading === 'heartsaver' ? 'Generating...' : 'Heartsaver Flyer'}
               </Button>
               
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={() => handleDownloadFlyer('schedule')}
+                disabled={isDownloading === 'schedule'}
                 className="w-full justify-start"
                 data-testid="button-download-schedule"
               >
-                <Download className="h-4 w-4 mr-2" />
-                Class Schedule
+                {isDownloading === 'schedule' ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {isDownloading === 'schedule' ? 'Generating...' : 'Class Schedule'}
               </Button>
             </div>
             
