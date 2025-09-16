@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen, Settings, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import ahaLogo from '@assets/generated_images/Official_AHA_heart_logo_8158ff2e.png';
+import ecgLogo from '@assets/generated_images/ECG_heartbeat_blip_logo_8ad5d5c7.png';
 
 export default function Header() {
   const [location] = useLocation();
@@ -34,18 +34,31 @@ export default function Header() {
   const isActive = (href: string) => location === href;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative overflow-hidden">
+      {/* ECG Paper Background */}
+      <div className="absolute inset-0 opacity-[0.02]" 
+           style={{
+             backgroundImage: `
+               linear-gradient(to right, #dc2626 1px, transparent 1px),
+               linear-gradient(to bottom, #dc2626 1px, transparent 1px)
+             `,
+             backgroundSize: '5px 5px'
+           }} 
+      />
+      
+      <div className="container mx-auto px-4 relative">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo and Business Name */}
-          <Link href="/" className="flex items-center space-x-3 hover-elevate rounded-lg px-2 py-1" data-testid="link-home">
+          {/* Logo and Business Name with ECG Line */}
+          <Link href="/" className="flex items-center space-x-3 hover-elevate rounded-lg px-2 py-1 relative" data-testid="link-home">
             <img 
-              src={ahaLogo} 
-              alt="American Heart Association" 
-              className="h-12 w-12"
+              src={ecgLogo} 
+              alt="ECG Heartbeat" 
+              className="h-8 w-12 object-contain"
             />
-            <div className="flex flex-col">
+            <div className="flex flex-col relative">
               <h1 className="text-lg font-bold text-foreground">LifeSaver CPR Training</h1>
+              {/* ECG Line Continuation */}
+              <div className="absolute -bottom-1 left-0 w-full h-px bg-gradient-to-r from-primary via-primary/60 to-transparent"></div>
             </div>
           </Link>
 
