@@ -35,49 +35,43 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative overflow-hidden">
-      {/* ECG Paper Grid Background */}
-      <div className="absolute inset-0 opacity-[0.03]" 
+      {/* ECG Paper Grid Background - subtle */}
+      <div className="absolute inset-0 opacity-[0.02]" 
            style={{
              backgroundImage: `
                linear-gradient(to right, #dc2626 0.5px, transparent 0.5px),
-               linear-gradient(to bottom, #dc2626 0.5px, transparent 0.5px),
-               linear-gradient(to right, #dc2626 1px, transparent 1px),
-               linear-gradient(to bottom, #dc2626 1px, transparent 1px)
+               linear-gradient(to bottom, #dc2626 0.5px, transparent 0.5px)
              `,
-             backgroundSize: '5px 5px, 5px 5px, 25px 25px, 25px 25px'
+             backgroundSize: '5px 5px',
+             maskImage: 'linear-gradient(to right, black 0%, black 40%, transparent 80%)',
+             WebkitMaskImage: 'linear-gradient(to right, black 0%, black 40%, transparent 80%)'
            }} 
       />
       
-      {/* ECG Rhythm Line with Heartbeat Pattern */}
-      <div className="absolute inset-0 flex items-center overflow-hidden">
-        <div className="w-full h-px relative">
-          <svg 
-            className="absolute left-0 top-0 w-full h-8 -translate-y-1/2" 
-            viewBox="0 0 800 32" 
-            style={{
-              opacity: 0.12,
-              maskImage: 'linear-gradient(to right, transparent 0%, black 10%, black 70%, transparent 100%)',
-              WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 10%, black 70%, transparent 100%)'
-            }}
-          >
-            <path 
-              d="M0,16 L100,16 L110,16 L115,8 L120,24 L130,4 L135,28 L140,16 L150,16 L800,16" 
-              stroke="#dc2626" 
-              strokeWidth="1.5" 
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-      </div>
-      
       <div className="container mx-auto px-4 relative">
         <div className="flex h-16 items-center justify-between">
-          {/* Business Name with ECG Integration */}
-          <Link href="/" className="flex items-center space-x-3 hover-elevate rounded-lg px-2 py-1 relative" data-testid="link-home">
+          {/* Business Name with ECG Underline */}
+          <Link href="/" className="flex items-center space-x-4 hover-elevate rounded-lg px-2 py-1 relative" data-testid="link-home">
             <div className="flex flex-col relative">
-              <h1 className="text-lg font-bold text-foreground relative z-10 bg-background/80 px-2 py-1 rounded">LifeSaver CPR Training</h1>
+              <h1 className="text-lg font-bold text-foreground mb-1">LifeSaver CPR Training</h1>
+              {/* ECG Heartbeat Pattern as Underline */}
+              <div className="absolute -bottom-1 left-0 w-full">
+                <svg 
+                  className="w-full h-3" 
+                  viewBox="0 0 300 12" 
+                  preserveAspectRatio="none"
+                >
+                  <path 
+                    d="M0,6 L50,6 L55,6 L58,2 L62,10 L68,1 L72,11 L75,6 L300,6" 
+                    stroke="#dc2626" 
+                    strokeWidth="1.2" 
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.6"
+                  />
+                </svg>
+              </div>
             </div>
           </Link>
 
