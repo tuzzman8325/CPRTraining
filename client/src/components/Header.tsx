@@ -46,7 +46,6 @@ export default function Header() {
             />
             <div className="flex flex-col">
               <h1 className="text-lg font-bold text-foreground">LifeSaver CPR Training</h1>
-              <p className="text-xs text-muted-foreground">AHA Authorized Training Center</p>
             </div>
           </Link>
 
@@ -115,17 +114,6 @@ export default function Header() {
             )}
           </nav>
 
-          {/* Contact Info - Desktop */}
-          <div className="hidden lg:flex items-center space-x-4 text-sm text-muted-foreground">
-            <div className="flex items-center space-x-1">
-              <Phone className="h-4 w-4" />
-              <span>(555) 123-4567</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <Mail className="h-4 w-4" />
-              <span>info@lifesavercpr.com</span>
-            </div>
-          </div>
 
           {/* Mobile Menu */}
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -201,18 +189,6 @@ export default function Header() {
                   </Link>
                 )}
                 
-                <div className="border-t pt-4 mt-6">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Phone className="h-4 w-4" />
-                      <span>(555) 123-4567</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Mail className="h-4 w-4" />
-                      <span>info@lifesavercpr.com</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             </SheetContent>
           </Sheet>

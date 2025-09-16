@@ -16,7 +16,7 @@ export default function Hero() {
   };
 
   return (
-    <section className="bg-background py-16 lg:py-24">
+    <section className="bg-background py-12 lg:py-16">
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">

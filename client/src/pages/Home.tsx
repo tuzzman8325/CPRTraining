@@ -5,7 +5,7 @@ import InstructorProfile from '@/components/InstructorProfile';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Calendar as CalendarIcon, BookOpen } from 'lucide-react';
+import { ArrowRight, Calendar as CalendarIcon, BookOpen, Phone, Mail } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Class } from '@shared/schema';
@@ -79,7 +79,7 @@ export default function Home() {
         <Hero />
 
         {/* Classes Section */}
-        <section className="py-20 bg-background">
+        <section className="py-12 bg-background">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
               <h2 className="text-4xl lg:text-5xl font-bold mb-6 text-foreground">Choose Your Course</h2>
@@ -179,6 +179,40 @@ export default function Home() {
         </section>
 
       </main>
+
+      {/* Professional Contact Section */}
+      <section className="py-12 bg-muted/30 border-t">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h3 className="text-2xl font-bold mb-6 text-foreground">Contact Us</h3>
+            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+              Ready to start your CPR training? Get in touch with our certified instructors to learn more about our courses and schedule your training today.
+            </p>
+            
+            <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
+              <div className="flex items-center justify-center space-x-3 text-lg">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <Phone className="h-6 w-6 text-primary" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold text-foreground">Call Us</div>
+                  <div className="text-muted-foreground">(555) 123-4567</div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-center space-x-3 text-lg">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <Mail className="h-6 w-6 text-primary" />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold text-foreground">Email Us</div>
+                  <div className="text-muted-foreground">info@lifesavercpr.com</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <Footer />
     </div>
