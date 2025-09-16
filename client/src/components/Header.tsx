@@ -35,30 +35,49 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative overflow-hidden">
-      {/* ECG Paper Background */}
-      <div className="absolute inset-0 opacity-[0.02]" 
+      {/* ECG Paper Grid Background */}
+      <div className="absolute inset-0 opacity-[0.03]" 
            style={{
              backgroundImage: `
+               linear-gradient(to right, #dc2626 0.5px, transparent 0.5px),
+               linear-gradient(to bottom, #dc2626 0.5px, transparent 0.5px),
                linear-gradient(to right, #dc2626 1px, transparent 1px),
                linear-gradient(to bottom, #dc2626 1px, transparent 1px)
              `,
-             backgroundSize: '5px 5px'
+             backgroundSize: '5px 5px, 5px 5px, 25px 25px, 25px 25px'
            }} 
       />
       
+      {/* ECG Rhythm Line with Heartbeat Pattern */}
+      <div className="absolute inset-0 flex items-center overflow-hidden">
+        <div className="w-full h-px relative">
+          <svg 
+            className="absolute left-0 top-0 w-full h-8 -translate-y-1/2" 
+            viewBox="0 0 800 32" 
+            style={{
+              opacity: 0.12,
+              maskImage: 'linear-gradient(to right, transparent 0%, black 10%, black 70%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 10%, black 70%, transparent 100%)'
+            }}
+          >
+            <path 
+              d="M0,16 L100,16 L110,16 L115,8 L120,24 L130,4 L135,28 L140,16 L150,16 L800,16" 
+              stroke="#dc2626" 
+              strokeWidth="1.5" 
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+      
       <div className="container mx-auto px-4 relative">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo and Business Name with ECG Line */}
+          {/* Business Name with ECG Integration */}
           <Link href="/" className="flex items-center space-x-3 hover-elevate rounded-lg px-2 py-1 relative" data-testid="link-home">
-            <img 
-              src={ecgLogo} 
-              alt="ECG Heartbeat" 
-              className="h-8 w-12 object-contain"
-            />
             <div className="flex flex-col relative">
-              <h1 className="text-lg font-bold text-foreground">LifeSaver CPR Training</h1>
-              {/* ECG Line Continuation */}
-              <div className="absolute -bottom-1 left-0 w-full h-px bg-gradient-to-r from-primary via-primary/60 to-transparent"></div>
+              <h1 className="text-lg font-bold text-foreground relative z-10 bg-background/80 px-2 py-1 rounded">LifeSaver CPR Training</h1>
             </div>
           </Link>
 
