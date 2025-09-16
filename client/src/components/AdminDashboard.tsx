@@ -1385,8 +1385,8 @@ export default function AdminDashboard() {
                               )}
                             </div>
                             <Badge variant={
-                              client.certificationStatus === 'active' ? 'default' : 
-                              client.certificationStatus === 'update' ? 'secondary' : 
+                              client.certificationStatus === 'active' ? 'success' : 
+                              client.certificationStatus === 'update' ? 'warning' : 
                               'destructive'
                             }>
                               {client.certificationStatus}
@@ -1474,8 +1474,8 @@ export default function AdminDashboard() {
                               </TableCell>
                               <TableCell className="py-3">
                                 <Badge variant={
-                                  client.certificationStatus === 'active' ? 'default' : 
-                                  client.certificationStatus === 'update' ? 'secondary' : 
+                                  client.certificationStatus === 'active' ? 'success' : 
+                                  client.certificationStatus === 'update' ? 'warning' : 
                                   'destructive'
                                 }>
                                   {client.certificationStatus}
