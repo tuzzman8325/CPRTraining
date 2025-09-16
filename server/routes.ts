@@ -751,6 +751,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/clients/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteClient(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      res.json({ success: true, message: "Client deleted successfully" });
+    } catch (error) {
+      console.error("Delete client error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.get("/api/classes/:classId/roster", async (req, res) => {
     try {
       const { classId } = req.params;
