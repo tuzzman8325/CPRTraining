@@ -79,13 +79,13 @@ export default function Home() {
         <Hero />
 
         {/* Classes Section */}
-        <section className="py-16 bg-background">
+        <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold mb-4">Available Training Courses</h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Choose from our American Heart Association certified CPR courses designed for 
-                different skill levels and professional requirements.
+            <div className="text-center mb-16">
+              <h2 className="text-4xl lg:text-5xl font-bold mb-6 text-foreground">Choose Your Course</h2>
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+                Professional American Heart Association certified CPR training courses designed for 
+                different skill levels and professional requirements. Start your life-saving journey today.
               </p>
             </div>
 
@@ -178,28 +178,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Instructor Profile */}
-        <InstructorProfile />
-
-        {/* Quick Stats Section */}
-        <section className="py-16 bg-primary text-primary-foreground">
-          <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-              <div>
-                <div className="text-4xl font-bold mb-2">500+</div>
-                <div className="text-lg opacity-90">Students Trained</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold mb-2">10+</div>
-                <div className="text-lg opacity-90">Years Experience</div>
-              </div>
-              <div>
-                <div className="text-4xl font-bold mb-2">100%</div>
-                <div className="text-lg opacity-90">AHA Certified</div>
-              </div>
-            </div>
-          </div>
-        </section>
       </main>
 
       <Footer />

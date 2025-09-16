@@ -16,39 +16,27 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative overflow-hidden">
-      {/* Hero Image with Overlay */}
-      <div className="absolute inset-0">
-        <img 
-          src={heroImage}
-          alt="Professional CPR Training"
-          className="w-full h-full object-cover"
-        />
-        {/* Dark wash overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/40" />
-      </div>
-
-      {/* Content */}
-      <div className="relative container mx-auto px-4 py-24 lg:py-32">
-        <div className="max-w-2xl">
-          <h1 className="text-4xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+    <section className="bg-background py-16 lg:py-24">
+      <div className="container mx-auto px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
             Save Lives with 
             <span className="text-primary"> AHA Certified</span> CPR Training
           </h1>
           
-          <p className="text-xl text-gray-200 mb-8 leading-relaxed">
+          <p className="text-xl text-muted-foreground mb-8 leading-relaxed max-w-2xl mx-auto">
             Professional CPR and life support training courses taught by certified instructors. 
             Learn the skills that matter when every second counts.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-12">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Button 
               size="lg" 
               onClick={handleRegisterClick}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="min-w-48"
               data-testid="button-register-now"
             >
-              Register for Classes
+              View Available Classes
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             
@@ -56,42 +44,42 @@ export default function Hero() {
               size="lg" 
               variant="outline" 
               onClick={handleLearnMoreClick}
-              className="bg-white/10 border-white/20 text-white backdrop-blur-sm hover:bg-white/20"
+              className="min-w-48"
               data-testid="button-learn-more"
             >
-              Learn More
+              Learn More About Us
             </Button>
           </div>
 
           {/* Trust Indicators */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-white">
-            <div className="flex items-center space-x-3">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <Shield className="h-6 w-6 text-primary" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-3xl mx-auto">
+            <div className="flex flex-col items-center space-y-3">
+              <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center">
+                <Shield className="h-8 w-8 text-primary" />
               </div>
-              <div>
-                <h3 className="font-semibold">AHA Certified</h3>
-                <p className="text-sm text-gray-300">Official Training Center</p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <Users className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold">500+ Students</h3>
-                <p className="text-sm text-gray-300">Trained Successfully</p>
+              <div className="text-center">
+                <h3 className="font-semibold text-foreground">AHA Certified</h3>
+                <p className="text-sm text-muted-foreground">Official Training Center</p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <Award className="h-6 w-6 text-primary" />
+            <div className="flex flex-col items-center space-y-3">
+              <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center">
+                <Users className="h-8 w-8 text-primary" />
               </div>
-              <div>
-                <h3 className="font-semibold">Expert Instructor</h3>
-                <p className="text-sm text-gray-300">Years of Experience</p>
+              <div className="text-center">
+                <h3 className="font-semibold text-foreground">Expert Instruction</h3>
+                <p className="text-sm text-muted-foreground">Professional Certified Instructors</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center space-y-3">
+              <div className="w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center">
+                <Award className="h-8 w-8 text-primary" />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-foreground">Proven Results</h3>
+                <p className="text-sm text-muted-foreground">Life-Saving Skills Training</p>
               </div>
             </div>
           </div>

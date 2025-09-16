@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen, Settings, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import ekgLogo from '@assets/generated_images/EKG_line_logo_7cbd6728.png?url';
+import ahaLogo from '@assets/generated_images/AHA_certification_badge_22dd9294.png';
 
 export default function Header() {
   const [location] = useLocation();
@@ -24,6 +24,7 @@ export default function Header() {
     { href: '/', label: 'Home', icon: Heart },
     { href: '/classes', label: 'Classes', icon: BookOpen },
     { href: '/calendar', label: 'Calendar', icon: Calendar },
+    { href: '/about', label: 'About Us', icon: User },
   ];
 
   const handleLogout = () => {
@@ -39,13 +40,13 @@ export default function Header() {
           {/* Logo and Business Name */}
           <Link href="/" className="flex items-center space-x-3 hover-elevate rounded-lg px-2 py-1" data-testid="link-home">
             <img 
-              src={ekgLogo} 
-              alt="LifeSaver CPR Training" 
-              className="h-10 w-10"
+              src={ahaLogo} 
+              alt="American Heart Association" 
+              className="h-12 w-12"
             />
             <div className="flex flex-col">
               <h1 className="text-lg font-bold text-foreground">LifeSaver CPR Training</h1>
-              <p className="text-xs text-muted-foreground">AHA Certified Instructor</p>
+              <p className="text-xs text-muted-foreground">AHA Authorized Training Center</p>
             </div>
           </Link>
 
