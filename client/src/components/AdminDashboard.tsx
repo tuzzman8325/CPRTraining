@@ -1411,7 +1411,7 @@ export default function AdminDashboard() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleEditClient(client)}
+                                onClick={() => handleEdit(client)}
                                 className="flex items-center gap-1"
                               >
                                 <Edit className="h-3 w-3" />
@@ -1420,7 +1420,7 @@ export default function AdminDashboard() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleDeleteClient(client.id)}
+                                onClick={() => handleDelete(client.id)}
                                 className="flex items-center gap-1 text-destructive hover:text-destructive"
                               >
                                 <Trash className="h-3 w-3" />
@@ -1500,7 +1500,7 @@ export default function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleEditClient(client)}
+                                    onClick={() => handleEdit(client)}
                                     className="flex items-center gap-1"
                                     data-testid={`button-edit-${client.id}`}
                                   >
@@ -1510,7 +1510,7 @@ export default function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleDeleteClient(client.id)}
+                                    onClick={() => handleDelete(client.id)}
                                     className="flex items-center gap-1 text-destructive hover:text-destructive"
                                     data-testid={`button-delete-${client.id}`}
                                   >
