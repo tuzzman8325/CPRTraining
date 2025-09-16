@@ -805,7 +805,8 @@ export default function AdminDashboard() {
   // View class details function
   const handleViewClassDetails = async (classItem: Class) => {
     try {
-      const response = await fetch(`/api/classes/${classItem.id}/roster`);
+      // Add cache-busting parameter to force fresh data
+      const response = await fetch(`/api/classes/${classItem.id}/roster?${Date.now()}`);
       const data = await response.json();
       
       if (data.success) {
