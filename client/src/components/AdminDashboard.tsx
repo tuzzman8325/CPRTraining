@@ -136,7 +136,9 @@ import {
   Eye,
   Filter,
   ChevronLeft,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Shield,
+  UserMinus
 } from 'lucide-react';
 import {
   Tooltip,
@@ -1010,128 +1012,230 @@ export default function AdminDashboard() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent className="space-y-4">
-                {/* Search and Filter */}
-                <div className="flex items-center gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input
-                      placeholder="Search users by name or email..."
-                      value={userSearchTerm}
-                      onChange={(e) => setUserSearchTerm(e.target.value)}
-                      className="pl-10"
-                      data-testid="input-search-users"
-                    />
-                  </div>
+                {/* Search */}
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search users..."
+                    value={userSearchTerm}
+                    onChange={(e) => setUserSearchTerm(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-users"
+                  />
                 </div>
 
-                {/* Users Table */}
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead data-testid="header-name">Name</TableHead>
-                        <TableHead data-testid="header-email">Email</TableHead>
-                        <TableHead data-testid="header-role">Current Role</TableHead>
-                        <TableHead data-testid="header-actions">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {usersLoading ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8" data-testid="loading-users">
-                            Loading users...
-                          </TableCell>
-                        </TableRow>
-                      ) : (() => {
-                        const filteredUsers = users.filter(user => 
-                          `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-                          (user.email || '').toLowerCase().includes(userSearchTerm.toLowerCase())
-                        );
-                        
-                        if (filteredUsers.length === 0) {
-                          return (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground" data-testid="no-users-found">
-                                {userSearchTerm ? `No users found matching "${userSearchTerm}"` : 'No users found'}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        }
-                        
-                        return filteredUsers.map((user) => {
-                          const isCurrentUser = currentUser?.id === user.id;
-                          const canDemote = user.role === 'admin' && !isCurrentUser;
-                          
-                          return (
-                            <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                              <TableCell className="font-medium">
+                {/* Users Cards for Mobile/Tablet */}
+                <div className="md:hidden space-y-3">
+                  {usersLoading ? (
+                    <div className="text-center py-8 text-muted-foreground">Loading users...</div>
+                  ) : (() => {
+                    const filteredUsers = users.filter(user => 
+                      `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                      (user.email || '').toLowerCase().includes(userSearchTerm.toLowerCase())
+                    );
+                    
+                    if (filteredUsers.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-muted-foreground">
+                          {userSearchTerm ? `No users found matching "${userSearchTerm}"` : 'No users found'}
+                        </div>
+                      );
+                    }
+                    
+                    return filteredUsers.map((user) => {
+                      const isCurrentUser = currentUser?.id === user.id;
+                      const canDemote = user.role === 'admin' && !isCurrentUser;
+                      
+                      return (
+                        <Card key={user.id} className="p-4">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-start">
+                              <div>
                                 <div className="flex items-center gap-2">
-                                  {user.firstName && user.lastName ? 
-                                    `${user.firstName} ${user.lastName}` : 
-                                    user.email || 'Unknown User'
-                                  }
+                                  <span className="font-medium">
+                                    {user.firstName && user.lastName ? 
+                                      `${user.firstName} ${user.lastName}` : 
+                                      user.email || 'Unknown User'
+                                    }
+                                  </span>
                                   {isCurrentUser && (
-                                    <Badge variant="outline" className="text-xs" data-testid="badge-current-user">
-                                      You
-                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">You</Badge>
                                   )}
                                 </div>
-                              </TableCell>
-                              <TableCell>{user.email || 'No email'}</TableCell>
-                              <TableCell>
-                                <Badge 
-                                  variant={user.role === 'admin' ? 'default' : 'secondary'}
-                                  className={user.role === 'admin' ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}
-                                  data-testid={`badge-role-${user.role}`}
+                                <p className="text-sm text-muted-foreground">{user.email || 'No email'}</p>
+                              </div>
+                              <Badge 
+                                variant={user.role === 'admin' ? 'default' : 'secondary'}
+                                className={user.role === 'admin' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
+                              >
+                                {user.role}
+                              </Badge>
+                            </div>
+                            <div className="flex gap-2">
+                              {user.role === 'user' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateUserRoleMutation.mutate({ id: user.id, role: 'admin' })}
+                                  disabled={updateUserRoleMutation.isPending}
+                                  className="flex items-center gap-1"
                                 >
-                                  {user.role}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex gap-2">
-                                  {user.role === 'user' ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => updateUserRoleMutation.mutate({ id: user.id, role: 'admin' })}
-                                      disabled={updateUserRoleMutation.isPending}
-                                      data-testid={`button-promote-${user.id}`}
-                                    >
-                                      Promote to Admin
-                                    </Button>
-                                  ) : (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                              if (canDemote) {
-                                                updateUserRoleMutation.mutate({ id: user.id, role: 'user' });
-                                              }
-                                            }}
-                                            disabled={updateUserRoleMutation.isPending}
-                                            aria-disabled={!canDemote}
-                                            data-testid={`button-demote-${user.id}`}
-                                            className={!canDemote ? 'opacity-50 cursor-not-allowed' : ''}
-                                          >
-                                            Demote to User
-                                          </Button>
-                                        </span>
-                                      </TooltipTrigger>
-                                      {!canDemote && (
-                                        <TooltipContent>
-                                          <p>You cannot demote your own account to prevent admin lockout</p>
-                                        </TooltipContent>
+                                  <Shield className="h-3 w-3" />
+                                  Make Admin
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    if (canDemote) {
+                                      updateUserRoleMutation.mutate({ id: user.id, role: 'user' });
+                                    }
+                                  }}
+                                  disabled={updateUserRoleMutation.isPending || !canDemote}
+                                  className="flex items-center gap-1"
+                                  title={!canDemote ? 'Cannot demote your own account' : ''}
+                                >
+                                  <UserMinus className="h-3 w-3" />
+                                  Make User
+                                </Button>
+                              )}
+                              {!isCurrentUser && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => deleteUserMutation.mutate(user.id)}
+                                  disabled={deleteUserMutation.isPending}
+                                  className="flex items-center gap-1 text-destructive hover:text-destructive"
+                                >
+                                  <Trash className="h-3 w-3" />
+                                  Delete
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Users Table for Desktop */}
+                <div className="hidden md:block">
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-1/3">User</TableHead>
+                          <TableHead className="w-1/4">Role</TableHead>
+                          <TableHead className="w-5/12">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {usersLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center py-8" data-testid="loading-users">
+                              Loading users...
+                            </TableCell>
+                          </TableRow>
+                        ) : (() => {
+                          const filteredUsers = users.filter(user => 
+                            `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                            (user.email || '').toLowerCase().includes(userSearchTerm.toLowerCase())
+                          );
+                          
+                          if (filteredUsers.length === 0) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground" data-testid="no-users-found">
+                                  {userSearchTerm ? `No users found matching "${userSearchTerm}"` : 'No users found'}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+                          
+                          return filteredUsers.map((user) => {
+                            const isCurrentUser = currentUser?.id === user.id;
+                            const canDemote = user.role === 'admin' && !isCurrentUser;
+                            
+                            return (
+                              <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                                <TableCell className="py-3">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">
+                                        {user.firstName && user.lastName ? 
+                                          `${user.firstName} ${user.lastName}` : 
+                                          user.email || 'Unknown User'
+                                        }
+                                      </span>
+                                      {isCurrentUser && (
+                                        <Badge variant="outline" className="text-xs" data-testid="badge-current-user">
+                                          You
+                                        </Badge>
                                       )}
-                                    </Tooltip>
-                                  )}
-                                  
-                                  {/* Delete User Button */}
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">{user.email || 'No email'}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-3">
+                                  <Badge 
+                                    variant={user.role === 'admin' ? 'default' : 'secondary'}
+                                    className={user.role === 'admin' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
+                                    data-testid={`badge-role-${user.role}`}
+                                  >
+                                    {user.role}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="py-3">
+                                  <div className="flex gap-2">
+                                    {user.role === 'user' ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => updateUserRoleMutation.mutate({ id: user.id, role: 'admin' })}
+                                        disabled={updateUserRoleMutation.isPending}
+                                        data-testid={`button-promote-${user.id}`}
+                                        className="flex items-center gap-1"
+                                      >
+                                        <Shield className="h-3 w-3" />
+                                        Make Admin
+                                      </Button>
+                                    ) : (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => {
+                                                if (canDemote) {
+                                                  updateUserRoleMutation.mutate({ id: user.id, role: 'user' });
+                                                }
+                                              }}
+                                              disabled={updateUserRoleMutation.isPending}
+                                              aria-disabled={!canDemote}
+                                              data-testid={`button-demote-${user.id}`}
+                                              className={`flex items-center gap-1 ${!canDemote ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                              <UserMinus className="h-3 w-3" />
+                                              Make User
+                                            </Button>
+                                          </span>
+                                        </TooltipTrigger>
+                                        {!canDemote && (
+                                          <TooltipContent>
+                                            <p>You cannot demote your own account to prevent admin lockout</p>
+                                          </TooltipContent>
+                                        )}
+                                      </Tooltip>
+                                    )}
+                                    
+                                    {/* Delete User Button */}
+                                    {!isCurrentUser && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span>
                                         <Button
                                           size="sm"
                                           variant={isCurrentUser ? "outline" : "destructive"}
@@ -1154,6 +1258,7 @@ export default function AdminDashboard() {
                                       <p>{isCurrentUser ? 'You cannot delete your own account to prevent admin lockout' : 'Delete user account'}</p>
                                     </TooltipContent>
                                   </Tooltip>
+                                )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1163,6 +1268,7 @@ export default function AdminDashboard() {
                       }
                     </TableBody>
                   </Table>
+                </div>
                 </div>
               </CardContent>
             </CollapsibleContent>
@@ -1200,311 +1306,257 @@ export default function AdminDashboard() {
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent>
-            {/* Search and Filters */}
-            <div className="space-y-4 mb-6">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search clients by name or email..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    resetPagination();
-                  }}
-                  className="pl-10"
-                  data-testid="input-search-clients"
-                />
-              </div>
-
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Filters:</span>
-                </div>
-
-                {/* Certification Status Filter */}
-                <Select 
-                  value={clientFilters.certificationStatus} 
-                  onValueChange={(value) => {
-                    setClientFilters(prev => ({ ...prev, certificationStatus: value }));
-                    resetPagination();
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-40" data-testid="select-filter-certification">
-                    <SelectValue placeholder="Certification" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="update">Update</SelectItem>
-                    <SelectItem value="expired">Expired</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {/* Course Type Filter */}
-                <Select 
-                  value={clientFilters.courseType} 
-                  onValueChange={(value) => {
-                    setClientFilters(prev => ({ ...prev, courseType: value }));
-                    resetPagination();
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-40" data-testid="select-filter-course">
-                    <SelectValue placeholder="Course Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Courses</SelectItem>
-                    <SelectItem value="bls">BLS Only</SelectItem>
-                    <SelectItem value="heartsaver">Heartsaver Only</SelectItem>
-                    <SelectItem value="both">Both Courses</SelectItem>
-                    <SelectItem value="none">No Courses</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {/* Registration Date Filter */}
-                <Select 
-                  value={clientFilters.registrationDateRange} 
-                  onValueChange={(value) => {
-                    setClientFilters(prev => ({ ...prev, registrationDateRange: value }));
-                    resetPagination();
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-44" data-testid="select-filter-registration-date">
-                    <SelectValue placeholder="Registration Date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="thisYear">This Year</SelectItem>
-                    <SelectItem value="last6Months">Last 6 Months</SelectItem>
-                    <SelectItem value="last30Days">Last 30 Days</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {/* Last Course Date Filter */}
-                <Select 
-                  value={clientFilters.lastCourseDateRange} 
-                  onValueChange={(value) => {
-                    setClientFilters(prev => ({ ...prev, lastCourseDateRange: value }));
-                    resetPagination();
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-44" data-testid="select-filter-last-course-date">
-                    <SelectValue placeholder="Last Course Date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="thisYear">This Year</SelectItem>
-                    <SelectItem value="last6Months">Last 6 Months</SelectItem>
-                    <SelectItem value="last30Days">Last 30 Days</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Active Filters Summary */}
-              {(clientFilters.certificationStatus !== 'all' || 
-                clientFilters.courseType !== 'all' ||
-                clientFilters.registrationDateRange !== 'all' ||
-                clientFilters.lastCourseDateRange !== 'all') && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Active filters:</span>
-                  {clientFilters.certificationStatus !== 'all' && (
-                    <Badge variant="secondary">{clientFilters.certificationStatus}</Badge>
-                  )}
-                  {clientFilters.courseType !== 'all' && (
-                    <Badge variant="secondary">
-                      {clientFilters.courseType === 'bls' ? 'BLS' : 
-                       clientFilters.courseType === 'heartsaver' ? 'Heartsaver' :
-                       clientFilters.courseType === 'both' ? 'Both Courses' : 'No Courses'}
-                    </Badge>
-                  )}
-                  {clientFilters.registrationDateRange !== 'all' && (
-                    <Badge variant="secondary">
-                      Registered: {clientFilters.registrationDateRange === 'thisYear' ? 'This Year' :
-                                   clientFilters.registrationDateRange === 'last6Months' ? 'Last 6M' : 'Last 30D'}
-                    </Badge>
-                  )}
-                  {clientFilters.lastCourseDateRange !== 'all' && (
-                    <Badge variant="secondary">
-                      Last Course: {clientFilters.lastCourseDateRange === 'thisYear' ? 'This Year' :
-                                    clientFilters.lastCourseDateRange === 'last6Months' ? 'Last 6M' : 'Last 30D'}
-                    </Badge>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setClientFilters({
-                        certificationStatus: 'all',
-                        courseType: 'all',
-                        registrationDateRange: 'all',
-                        lastCourseDateRange: 'all'
-                      });
+              <CardContent className="space-y-4">
+                {/* Search and Quick Filter */}
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search clients..."
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        resetPagination();
+                      }}
+                      className="pl-10"
+                      data-testid="input-search-clients"
+                    />
+                  </div>
+                  <Select 
+                    value={clientFilters.certificationStatus} 
+                    onValueChange={(value) => {
+                      setClientFilters(prev => ({ ...prev, certificationStatus: value }));
                       resetPagination();
                     }}
-                    className="h-6 px-2 text-xs"
-                    data-testid="button-clear-filters"
                   >
-                    Clear All
-                  </Button>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="update">Update</SelectItem>
+                      <SelectItem value="expired">Expired</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-              
-              {/* Results Count */}
-              <div className="text-sm text-muted-foreground">
-                Showing {paginatedClients.length} of {filteredClients.length} clients
-                {filteredClients.length !== clients.length && (
-                  <span> (filtered from {clients.length} total)</span>
-                )}
-              </div>
-            </div>
 
-            {/* Clients Table */}
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Registration Date</TableHead>
-                    <TableHead>Last Course</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Courses</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                {/* Results Summary */}
+                <div className="flex justify-between items-center text-sm text-muted-foreground">
+                  <span>Showing {paginatedClients.length} of {filteredClients.length} clients</span>
+                  {clientFilters.certificationStatus !== 'all' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setClientFilters({
+                          certificationStatus: 'all',
+                          courseType: 'all',
+                          registrationDateRange: 'all',
+                          lastCourseDateRange: 'all'
+                        });
+                        resetPagination();
+                      }}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Clear Filter
+                    </Button>
+                  )}
+                </div>
+
+                {/* Client Cards for Mobile/Tablet */}
+                <div className="lg:hidden space-y-3">
                   {clientsLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        Loading clients...
-                      </TableCell>
-                    </TableRow>
+                    <div className="text-center py-8 text-muted-foreground">Loading clients...</div>
                   ) : paginatedClients.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        {filteredClients.length === 0 ? 'No clients found' : 'No clients on this page'}
-                      </TableCell>
-                    </TableRow>
+                    <div className="text-center py-8 text-muted-foreground">
+                      {filteredClients.length === 0 ? 'No clients found' : 'No clients on this page'}
+                    </div>
                   ) : (
                     paginatedClients.map((client) => (
-                      <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
-                        <TableCell className="font-medium">{client.firstName} {client.lastName}</TableCell>
-                        <TableCell>{client.email}</TableCell>
-                        <TableCell>{client.phone || 'N/A'}</TableCell>
-                        <TableCell>{client.registrationDate}</TableCell>
-                        <TableCell>{client.lastCourseDate}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            client.certificationStatus === 'active' ? 'success' : 
-                            client.certificationStatus === 'update' ? 'warning' : 
-                            'destructive'
-                          }>
-                            {client.certificationStatus}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            {client.completedCourses.map((course, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                {course}
-                              </Badge>
-                            ))}
+                      <Card key={client.id} className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium">{client.firstName} {client.lastName}</div>
+                              <p className="text-sm text-muted-foreground">{client.email}</p>
+                              {client.phone && (
+                                <p className="text-sm text-muted-foreground">{client.phone}</p>
+                              )}
+                            </div>
+                            <Badge variant={
+                              client.certificationStatus === 'active' ? 'default' : 
+                              client.certificationStatus === 'update' ? 'secondary' : 
+                              'destructive'
+                            }>
+                              {client.certificationStatus}
+                            </Badge>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" data-testid={`button-actions-${client.id}`}>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(client)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleDelete(client.id)}
-                                className="text-destructive"
+                          
+                          {client.completedCourses.length > 0 && (
+                            <div className="flex gap-1 flex-wrap">
+                              {client.completedCourses.map((course, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {course}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          
+                          <div className="flex justify-between items-center pt-2 border-t">
+                            <div className="text-xs text-muted-foreground">
+                              Registered: {client.registrationDate}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditClient(client)}
+                                className="flex items-center gap-1"
                               >
-                                <Trash className="h-4 w-4 mr-2" />
+                                <Edit className="h-3 w-3" />
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteClient(client.id)}
+                                className="flex items-center gap-1 text-destructive hover:text-destructive"
+                              >
+                                <Trash className="h-3 w-3" />
                                 Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
                     ))
                   )}
-                </TableBody>
-              </Table>
-            </div>
+                </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages}
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    data-testid="button-previous-page"
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
-                  </Button>
-                  
-                  {/* Page Numbers */}
-                  <div className="flex gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      
-                      return (
-                        <Button
-                          key={pageNum}
-                          variant={currentPage === pageNum ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentPage(pageNum)}
-                          className="w-8 h-8 p-0"
-                          data-testid={`button-page-${pageNum}`}
-                        >
-                          {pageNum}
-                        </Button>
-                      );
-                    })}
+                {/* Client Table for Desktop */}
+                <div className="hidden lg:block">
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-1/4">Client</TableHead>
+                          <TableHead className="w-1/6">Status</TableHead>
+                          <TableHead className="w-1/4">Courses</TableHead>
+                          <TableHead className="w-1/6">Last Course</TableHead>
+                          <TableHead className="w-1/6">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clientsLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              Loading clients...
+                            </TableCell>
+                          </TableRow>
+                        ) : paginatedClients.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              {filteredClients.length === 0 ? 'No clients found' : 'No clients on this page'}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          paginatedClients.map((client) => (
+                            <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
+                              <TableCell className="py-3">
+                                <div>
+                                  <div className="font-medium">{client.firstName} {client.lastName}</div>
+                                  <p className="text-sm text-muted-foreground">{client.email}</p>
+                                  {client.phone && (
+                                    <p className="text-xs text-muted-foreground">{client.phone}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <Badge variant={
+                                  client.certificationStatus === 'active' ? 'default' : 
+                                  client.certificationStatus === 'update' ? 'secondary' : 
+                                  'destructive'
+                                }>
+                                  {client.certificationStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <div className="flex gap-1 flex-wrap">
+                                  {client.completedCourses.length > 0 ? client.completedCourses.map((course, idx) => (
+                                    <Badge key={idx} variant="outline" className="text-xs">
+                                      {course}
+                                    </Badge>
+                                  )) : (
+                                    <span className="text-sm text-muted-foreground">None</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <span className="text-sm">{client.lastCourseDate || 'Never'}</span>
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditClient(client)}
+                                    className="flex items-center gap-1"
+                                    data-testid={`button-edit-${client.id}`}
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteClient(client.id)}
+                                    className="flex items-center gap-1 text-destructive hover:text-destructive"
+                                    data-testid={`button-delete-${client.id}`}
+                                  >
+                                    <Trash className="h-3 w-3" />
+                                    Delete
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    data-testid="button-next-page"
-                  >
-                    Next
-                    <ChevronRightIcon className="h-4 w-4 ml-1" />
-                  </Button>
                 </div>
-              </div>
-            )}
+
+                {/* Simplified Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-between items-center mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        data-testid="button-previous-page"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        data-testid="button-next-page"
+                      >
+                        Next
+                        <ChevronRightIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </CollapsibleContent>
           </Card>
