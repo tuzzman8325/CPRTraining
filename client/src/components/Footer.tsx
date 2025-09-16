@@ -54,8 +54,26 @@ export default function Footer() {
   };
 
   const handleContactClick = (method: string) => {
-    console.log(`Contact via ${method}`);
-    // TODO: Implement contact functionality
+    switch (method) {
+      case 'phone':
+        window.location.href = 'tel:+15551234567';
+        toast({
+          title: 'Opening Phone',
+          description: 'Opening phone dialer to call (555) 123-4567',
+        });
+        break;
+      case 'email':
+        const subject = encodeURIComponent('CPR Training Inquiry');
+        const body = encodeURIComponent('Hello, I am interested in learning more about your CPR training courses.');
+        window.location.href = `mailto:info@lifesavercpr.com?subject=${subject}&body=${body}`;
+        toast({
+          title: 'Opening Email',
+          description: 'Opening email client to contact us',
+        });
+        break;
+      default:
+        console.log(`Unknown contact method: ${method}`);
+    }
   };
 
   return (
