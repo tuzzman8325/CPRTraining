@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Menu, Phone, Mail, Heart, User, Calendar, BookOpen, Settings, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import ahaLogo from '@assets/generated_images/AHA_certification_badge_22dd9294.png';
+import ahaLogo from '@assets/generated_images/AHA_heart_torch_logo_550880cc.png';
 
 export default function Header() {
   const [location] = useLocation();
