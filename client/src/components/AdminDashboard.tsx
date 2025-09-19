@@ -3900,18 +3900,19 @@ function AdminDashboardContent() {
 
         {/* Add Class Type Dialog */}
         <Dialog open={isAddClassTypeDialogOpen} onOpenChange={setIsAddClassTypeDialogOpen}>
-          <DialogContent className="max-w-md max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>Add New Class Type</DialogTitle>
-              <DialogDescription>
-                Create a new class type for organizing your training classes.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <Form {...addClassTypeForm}>
-              <form onSubmit={addClassTypeForm.handleSubmit(onAddClassTypeSubmit)} className="space-y-4">
-                <ScrollArea className="max-h-[50vh] pr-4">
-                  <div className="space-y-4">
+          <DialogContent className="sm:max-w-[640px] p-0">
+            <div className="max-h-[85vh] flex flex-col">
+              <DialogHeader className="p-6 shrink-0">
+                <DialogTitle>Add New Class Type</DialogTitle>
+                <DialogDescription>
+                  Create a new class type for organizing your training classes.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Form {...addClassTypeForm}>
+                <form onSubmit={addClassTypeForm.handleSubmit(onAddClassTypeSubmit)} className="flex flex-col flex-1">
+                  <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-2">
+                    <div className="space-y-4">
                 <FormField
                   control={addClassTypeForm.control}
                   name="name"
@@ -4035,46 +4036,48 @@ function AdminDashboardContent() {
                     </FormItem>
                   )}
                 />
+                    </div>
                   </div>
-                </ScrollArea>
-                
-                <DialogFooter className="pt-4 border-t">
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsAddClassTypeDialogOpen(false)}
-                    data-testid="button-cancel-add-classtype"
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={createClassTypeMutation.isPending}
-                    data-testid="button-submit-add-classtype"
-                  >
-                    {createClassTypeMutation.isPending ? 'Creating...' : 'Create Class Type'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
+                  
+                  <DialogFooter className="p-6 border-t shrink-0">
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsAddClassTypeDialogOpen(false)}
+                      data-testid="button-cancel-add-classtype"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={createClassTypeMutation.isPending}
+                      data-testid="button-submit-add-classtype"
+                    >
+                      {createClassTypeMutation.isPending ? 'Creating...' : 'Create Class Type'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </div>
           </DialogContent>
         </Dialog>
 
         {/* Edit Class Type Dialog */}
         <Dialog open={isEditClassTypeDialogOpen} onOpenChange={setIsEditClassTypeDialogOpen}>
-          <DialogContent className="max-w-md max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>Edit Class Type</DialogTitle>
-              <DialogDescription>
-                Update class type information and settings.
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedClassType && (
-              <Form {...editClassTypeForm}>
-                <form onSubmit={editClassTypeForm.handleSubmit(onEditClassTypeSubmit)} className="space-y-4">
-                  <ScrollArea className="max-h-[50vh] pr-4">
-                    <div className="space-y-4">
+          <DialogContent className="sm:max-w-[640px] p-0">
+            <div className="max-h-[85vh] flex flex-col">
+              <DialogHeader className="p-6 shrink-0">
+                <DialogTitle>Edit Class Type</DialogTitle>
+                <DialogDescription>
+                  Update class type information and settings.
+                </DialogDescription>
+              </DialogHeader>
+              
+              {selectedClassType && (
+                <Form {...editClassTypeForm}>
+                  <form onSubmit={editClassTypeForm.handleSubmit(onEditClassTypeSubmit)} className="flex flex-col flex-1">
+                    <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-2">
+                      <div className="space-y-4">
                   <FormField
                     control={editClassTypeForm.control}
                     name="name"
@@ -4198,29 +4201,30 @@ function AdminDashboardContent() {
                       </FormItem>
                     )}
                   />
+                      </div>
                     </div>
-                  </ScrollArea>
-                  
-                  <DialogFooter className="pt-4 border-t">
-                    <Button 
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsEditClassTypeDialogOpen(false)}
-                      data-testid="button-cancel-edit-classtype"
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={updateClassTypeMutation.isPending}
-                      data-testid="button-submit-edit-classtype"
-                    >
-                      {updateClassTypeMutation.isPending ? 'Updating...' : 'Update Class Type'}
-                    </Button>
-                  </DialogFooter>
+                    
+                    <DialogFooter className="p-6 border-t shrink-0">
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsEditClassTypeDialogOpen(false)}
+                        data-testid="button-cancel-edit-classtype"
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={updateClassTypeMutation.isPending}
+                        data-testid="button-submit-edit-classtype"
+                      >
+                        {updateClassTypeMutation.isPending ? 'Updating...' : 'Update Class Type'}
+                      </Button>
+                    </DialogFooter>
                 </form>
               </Form>
             )}
+            </div>
           </DialogContent>
         </Dialog>
 
