@@ -20,6 +20,17 @@ export class EmailService {
   private transporter!: nodemailer.Transporter;
   private isConfigured: boolean = false;
 
+  // HTML escaping utility for user-provided content
+  private escapeHtml(unsafe: string): string {
+    if (typeof unsafe !== 'string') return String(unsafe);
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   constructor() {
     this.setupTransporter();
   }
@@ -30,8 +41,8 @@ export class EmailService {
       const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
 
       if (!gmailUser || !gmailAppPassword) {
-        console.warn('Gmail credentials not found. Email service will not be available.');
-        console.warn('Please set GMAIL_USER and GMAIL_APP_PASSWORD environment variables.');
+        console.warn('[EMAIL_CONFIG] Gmail credentials not found. Email service will not be available.');
+        console.warn('[EMAIL_CONFIG] Please set GMAIL_USER and GMAIL_APP_PASSWORD environment variables.');
         this.isConfigured = false;
         return;
       }
@@ -41,16 +52,20 @@ export class EmailService {
         auth: {
           user: gmailUser,
           pass: gmailAppPassword
-        },
-        tls: {
-          rejectUnauthorized: false
         }
       });
 
       this.isConfigured = true;
-      console.log('Email service configured successfully');
+      console.log('[EMAIL_CONFIG] Email service configured successfully');
+      
+      // Perform startup verification
+      this.verifyConnection().then((isWorking) => {
+        if (!isWorking) {
+          console.warn('[EMAIL_STARTUP] Email connection verification failed - emails may not be delivered');
+        }
+      });
     } catch (error) {
-      console.error('Failed to configure email service:', error);
+      console.error('[EMAIL_CONFIG] Failed to configure email service:', error);
       this.isConfigured = false;
     }
   }
@@ -63,10 +78,10 @@ export class EmailService {
 
     try {
       await this.transporter.verify();
-      console.log('Email connection verified successfully');
+      console.log('[EMAIL_VERIFY] Email connection verified successfully');
       return true;
     } catch (error) {
-      console.error('Email connection verification failed:', error);
+      console.error('[EMAIL_VERIFY] Email connection verification failed:', error);
       return false;
     }
   }
@@ -104,7 +119,7 @@ export class EmailService {
     const formattedDate = this.formatDate(classData.date);
     const formattedTime = this.formatTime(classData.time);
     const originalPrice = this.formatCurrency(classData.price);
-    const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount * 100) : originalPrice;
+    const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount * 100) : 'Pending';
     
     return `
 <!DOCTYPE html>
@@ -271,10 +286,10 @@ export class EmailService {
         
         <div class="content">
             <div class="confirmation-badge">
-                ✓ Registration Confirmed
+                Registration Confirmed
             </div>
             
-            <h2>Hello ${registration.firstName} ${registration.lastName},</h2>
+            <h2>Hello ${this.escapeHtml(registration.firstName)} ${this.escapeHtml(registration.lastName)},</h2>
             
             <p>Thank you for registering for our CPR training class! Your registration has been successfully confirmed. Below are your class details:</p>
             
@@ -282,7 +297,7 @@ export class EmailService {
                 <h3 style="margin-top: 0; color: #dc2626;">Class Information</h3>
                 <div class="detail-row">
                     <span class="detail-label">Class:</span>
-                    <span class="detail-value">${classData.title}</span>
+                    <span class="detail-value">${this.escapeHtml(classData.title)}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Type:</span>
@@ -298,18 +313,18 @@ export class EmailService {
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Duration:</span>
-                    <span class="detail-value">${classData.duration}</span>
+                    <span class="detail-value">${this.escapeHtml(classData.duration)}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Registration ID:</span>
-                    <span class="detail-value">${registration.id}</span>
+                    <span class="detail-value">${this.escapeHtml(registration.id)}</span>
                 </div>
             </div>
 
             ${discountCode ? `
             <div class="discount-applied">
-                <strong>Discount Applied:</strong> ${discountCode.code}
-                ${discountCode.description ? `<br><em>${discountCode.description}</em>` : ''}
+                <strong>Discount Applied:</strong> ${this.escapeHtml(discountCode.code)}
+                ${discountCode.description ? `<br><em>${this.escapeHtml(discountCode.description)}</em>` : ''}
             </div>
             ` : ''}
 
@@ -332,13 +347,13 @@ export class EmailService {
                 ${registration.paymentIntentId ? `
                 <div class="detail-row">
                     <span class="detail-label">Payment ID:</span>
-                    <span class="detail-value">${registration.paymentIntentId}</span>
+                    <span class="detail-value">${this.escapeHtml(registration.paymentIntentId)}</span>
                 </div>
                 ` : ''}
             </div>
 
             <div class="certification-note">
-                🏆 Upon successful completion, you will receive an American Heart Association (AHA) certification card valid for 2 years.
+                Upon successful completion, you will receive an American Heart Association (AHA) certification card valid for 2 years.
             </div>
 
             <div class="next-steps">
@@ -383,30 +398,30 @@ export class EmailService {
     const formattedDate = this.formatDate(classData.date);
     const formattedTime = this.formatTime(classData.time);
     const originalPrice = this.formatCurrency(classData.price);
-    const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount * 100) : originalPrice;
+    const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount * 100) : 'Pending';
 
     return `
 CPR TRAINING PRO - REGISTRATION CONFIRMATION
 
-Hello ${registration.firstName} ${registration.lastName},
+Hello ${this.escapeHtml(registration.firstName)} ${this.escapeHtml(registration.lastName)},
 
 Thank you for registering for our CPR training class! Your registration has been successfully confirmed.
 
 CLASS INFORMATION:
-- Class: ${classData.title}
+- Class: ${this.escapeHtml(classData.title)}
 - Type: ${classData.type === 'BLS' ? 'Basic Life Support (BLS)' : 'Heartsaver CPR/AED'}
 - Date: ${formattedDate}
 - Time: ${formattedTime}
-- Duration: ${classData.duration}
-- Registration ID: ${registration.id}
+- Duration: ${this.escapeHtml(classData.duration)}
+- Registration ID: ${this.escapeHtml(registration.id)}
 
-${discountCode ? `DISCOUNT APPLIED: ${discountCode.code}${discountCode.description ? ` - ${discountCode.description}` : ''}` : ''}
+${discountCode ? `DISCOUNT APPLIED: ${this.escapeHtml(discountCode.code)}${discountCode.description ? ` - ${this.escapeHtml(discountCode.description)}` : ''}` : ''}
 
 PAYMENT DETAILS:
 ${classData.price !== (paymentAmount || 0) * 100 ? `- Original Price: ${originalPrice}` : ''}
 - Amount Paid: ${finalAmount}
 - Payment Status: ${registration.status === 'confirmed' ? 'Confirmed' : 'Pending'}
-${registration.paymentIntentId ? `- Payment ID: ${registration.paymentIntentId}` : ''}
+${registration.paymentIntentId ? `- Payment ID: ${this.escapeHtml(registration.paymentIntentId)}` : ''}
 
 CERTIFICATION: Upon successful completion, you will receive an American Heart Association (AHA) certification card valid for 2 years.
 
@@ -435,9 +450,8 @@ This is an automated confirmation email. Please save this email for your records
   // Send registration confirmation email
   public async sendRegistrationConfirmation(data: RegistrationEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.isConfigured) {
-      const error = 'Email service is not configured. Please check Gmail credentials.';
-      console.error(error);
-      return { success: false, error };
+      console.warn('[EMAIL_CONFIG] Email service not configured - skipping email delivery');
+      return { success: false, error: 'Email service not configured' };
     }
 
     try {
@@ -464,11 +478,11 @@ This is an automated confirmation email. Please save this email for your records
         }
       };
 
-      console.log(`Sending registration confirmation email to ${registration.email} for class: ${classData.title}`);
+      console.log(`[EMAIL_SEND] Sending registration confirmation email to ${registration.email} for class: ${classData.title}`);
       
       const info = await this.transporter.sendMail(mailOptions);
       
-      console.log(`Registration confirmation email sent successfully. Message ID: ${info.messageId}`);
+      console.log(`[EMAIL_SUCCESS] Registration confirmation email sent successfully. Message ID: ${info.messageId}`);
       
       return { 
         success: true, 
@@ -476,7 +490,7 @@ This is an automated confirmation email. Please save this email for your records
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Failed to send registration confirmation email:', error);
+      console.error('[EMAIL_ERROR] Failed to send registration confirmation email:', error);
       
       return { 
         success: false, 
@@ -488,9 +502,8 @@ This is an automated confirmation email. Please save this email for your records
   // Send class reminder email (for future use)
   public async sendClassReminder(data: RegistrationEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.isConfigured) {
-      const error = 'Email service is not configured. Please check Gmail credentials.';
-      console.error(error);
-      return { success: false, error };
+      console.warn('[EMAIL_CONFIG] Email service not configured - skipping reminder email');
+      return { success: false, error: 'Email service not configured' };
     }
 
     try {
@@ -501,10 +514,10 @@ This is an automated confirmation email. Please save this email for your records
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #dc2626;">Class Reminder</h2>
-          <p>Hello ${registration.firstName},</p>
+          <p>Hello ${this.escapeHtml(registration.firstName)},</p>
           <p>This is a friendly reminder that your CPR training class is scheduled for tomorrow:</p>
           <ul>
-            <li><strong>Class:</strong> ${classData.title}</li>
+            <li><strong>Class:</strong> ${this.escapeHtml(classData.title)}</li>
             <li><strong>Date:</strong> ${this.formatDate(classData.date)}</li>
             <li><strong>Time:</strong> ${this.formatTime(classData.time)}</li>
           </ul>
@@ -526,7 +539,7 @@ This is an automated confirmation email. Please save this email for your records
 
       const info = await this.transporter.sendMail(mailOptions);
       
-      console.log(`Class reminder email sent successfully. Message ID: ${info.messageId}`);
+      console.log(`[EMAIL_SUCCESS] Class reminder email sent successfully. Message ID: ${info.messageId}`);
       
       return { 
         success: true, 
@@ -534,7 +547,7 @@ This is an automated confirmation email. Please save this email for your records
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Failed to send class reminder email:', error);
+      console.error('[EMAIL_ERROR] Failed to send class reminder email:', error);
       
       return { 
         success: false, 
@@ -546,9 +559,8 @@ This is an automated confirmation email. Please save this email for your records
   // Test email functionality
   public async sendTestEmail(to: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.isConfigured) {
-      const error = 'Email service is not configured. Please check Gmail credentials.';
-      console.error(error);
-      return { success: false, error };
+      console.warn('[EMAIL_CONFIG] Email service not configured - cannot send test email');
+      return { success: false, error: 'Email service not configured' };
     }
 
     try {
@@ -571,7 +583,7 @@ This is an automated confirmation email. Please save this email for your records
 
       const info = await this.transporter.sendMail(mailOptions);
       
-      console.log(`Test email sent successfully. Message ID: ${info.messageId}`);
+      console.log(`[EMAIL_SUCCESS] Test email sent successfully. Message ID: ${info.messageId}`);
       
       return { 
         success: true, 
@@ -579,7 +591,7 @@ This is an automated confirmation email. Please save this email for your records
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error('Failed to send test email:', error);
+      console.error('[EMAIL_ERROR] Failed to send test email:', error);
       
       return { 
         success: false, 

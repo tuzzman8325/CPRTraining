@@ -8,6 +8,7 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertClassSchema, insertClassTypeSchema, insertRegistrationSchema, insertDiscountCodeSchema, insertClientSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { EmailService } from "./email-service";
 
 // Use testing keys in development, live keys in production
 const stripeSecretKey = process.env.NODE_ENV === 'development' 
@@ -22,6 +23,9 @@ console.log(`Using Stripe in ${process.env.NODE_ENV} mode`);
 const stripe = new Stripe(stripeSecretKey, {
   apiVersion: "2025-08-27.basil",
 });
+
+// Initialize email service
+const emailService = new EmailService();
 
 // Configure multer for image uploads
 const storage_multer = multer.diskStorage({
@@ -626,6 +630,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Creating registration...");
       const registration = await storage.createRegistration(registrationData);
       console.log("Registration created:", registration);
+      
+      // Send confirmation email after successful registration
+      try {
+        console.log("Attempting to send confirmation email...");
+        
+        // Get discount code details if applicable
+        let discountCode = null;
+        if (registrationData.discountCodeId) {
+          const discountCodes = await storage.getDiscountCodes();
+          discountCode = discountCodes.find(dc => dc.id === registrationData.discountCodeId) || null;
+        }
+        
+        // Calculate payment amount (convert from cents to dollars for email display)
+        const paymentAmount = registrationData.amountPaid ? registrationData.amountPaid / 100 : undefined;
+        
+        // Send confirmation email in fire-and-forget pattern (non-blocking)
+        console.log(`[EMAIL_QUEUE] Queuing confirmation email for ${registration.email} (Registration: ${registration.id})`);
+        emailService.sendRegistrationConfirmation({
+          registration,
+          classData,
+          discountCode,
+          paymentAmount
+        }).then((result) => {
+          if (result.success) {
+            console.log(`[EMAIL_SUCCESS] Confirmation email sent to ${registration.email} (Registration: ${registration.id}, Message ID: ${result.messageId})`);
+          } else {
+            console.error(`[EMAIL_ERROR] Failed to send confirmation email to ${registration.email} (Registration: ${registration.id}): ${result.error}`);
+          }
+        }).catch((emailError) => {
+          console.error(`[EMAIL_ERROR] Email service error for ${registration.email} (Registration: ${registration.id}):`, emailError);
+        });
+        
+        console.log(`[EMAIL_QUEUE] Email queued for background processing`);
+      } catch (emailError) {
+        // Log email error but don't break the registration process
+        console.error(`[EMAIL_ERROR] Failed to queue confirmation email to ${registration.email}:`, emailError);
+        console.error("Registration was successful but email queueing failed");
+      }
       
       res.status(201).json({ 
         success: true, 
