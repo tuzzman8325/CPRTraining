@@ -1,8 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import express from "express";
 import Stripe from "stripe";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
-import { insertClassSchema, insertRegistrationSchema, insertDiscountCodeSchema, insertClientSchema } from "@shared/schema";
+import { insertClassSchema, insertClassTypeSchema, insertRegistrationSchema, insertDiscountCodeSchema, insertClientSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
 // Use testing keys in development, live keys in production
@@ -19,9 +23,83 @@ const stripe = new Stripe(stripeSecretKey, {
   apiVersion: "2025-08-27.basil",
 });
 
+// Configure multer for image uploads
+const storage_multer = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(process.cwd(), 'attached_assets', 'uploads');
+    
+    // Ensure upload directory exists
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with timestamp and random string
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const extension = path.extname(file.originalname);
+    cb(null, `${file.fieldname}-${uniqueSuffix}${extension}`);
+  }
+});
+
+const upload = multer({
+  storage: storage_multer,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.'));
+    }
+  }
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve uploaded images statically
+  const uploadsPath = path.join(process.cwd(), 'attached_assets', 'uploads');
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+  }
+  app.use('/assets/uploads', express.static(uploadsPath));
+
   // Set up Replit Auth middleware
   await setupAuth(app);
+
+  // Image upload route
+  app.post('/api/upload-image', upload.single('image'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No image file provided' });
+      }
+
+      // Return the relative path that can be used in the frontend
+      const imagePath = `/assets/uploads/${req.file.filename}`;
+      
+      res.json({
+        success: true,
+        imagePath,
+        message: 'Image uploaded successfully'
+      });
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      
+      // Handle multer errors specifically
+      if (error instanceof multer.MulterError) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: 'File too large. Maximum size is 5MB.' });
+        }
+      }
+      
+      res.status(500).json({ 
+        error: error.message || 'Failed to upload image' 
+      });
+    }
+  });
 
   // Replit Auth user endpoint
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -200,6 +278,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Class Type management routes
+  app.get("/api/class-types", async (req, res) => {
+    try {
+      const classTypes = await storage.getClassTypes();
+      res.json({ success: true, classTypes });
+    } catch (error) {
+      console.error("Get class types error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/class-types/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const classType = await storage.getClassTypeById(id);
+      
+      if (!classType) {
+        return res.status(404).json({ error: "Class type not found" });
+      }
+
+      res.json({ success: true, classType });
+    } catch (error) {
+      console.error("Get class type error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/class-types", requireAdmin, async (req, res) => {
+    try {
+      const classTypeData = insertClassTypeSchema.parse(req.body);
+      const newClassType = await storage.createClassType(classTypeData);
+      
+      res.status(201).json({ 
+        success: true, 
+        classType: newClassType,
+        message: "Class type created successfully"
+      });
+    } catch (error) {
+      console.error("Create class type error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid class type data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/class-types/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = insertClassTypeSchema.partial().parse(req.body);
+      
+      const updatedClassType = await storage.updateClassType(id, updates);
+      
+      if (!updatedClassType) {
+        return res.status(404).json({ error: "Class type not found" });
+      }
+
+      res.json({ 
+        success: true, 
+        classType: updatedClassType,
+        message: "Class type updated successfully"
+      });
+    } catch (error) {
+      console.error("Update class type error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid class type data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/class-types/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await storage.deleteClassType(id);
+      
+      if (!result.success) {
+        if (result.classCount && result.classCount > 0) {
+          return res.status(409).json({ 
+            error: result.error,
+            classCount: result.classCount 
+          });
+        }
+        return res.status(404).json({ error: "Class type not found" });
+      }
+
+      res.json({ 
+        success: true,
+        message: "Class type deleted successfully"
+      });
+    } catch (error) {
+      console.error("Delete class type error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Class management routes
   app.get("/api/classes", async (req, res) => {
     try {
@@ -209,6 +383,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, classes });
     } catch (error) {
       console.error("Get classes error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Put specific routes before parameterized routes
+  app.get("/api/classes/grouped-by-type", async (req, res) => {
+    try {
+      const groupedClasses = await storage.getClassesGroupedByType();
+      res.json({ success: true, groupedClasses });
+    } catch (error) {
+      console.error("Get grouped classes error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

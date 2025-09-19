@@ -4,6 +4,17 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const classTypeEnum = pgEnum("class_type", ["BLS", "Heartsaver"]);
+
+// Dynamic class types table for flexible type management
+export const classTypes = pgTable("class_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // e.g., "BLS", "Heartsaver", "First Aid"
+  displayName: text("display_name").notNull(), // e.g., "Basic Life Support", "Heartsaver CPR/AED"
+  description: text("description"), // Optional detailed description
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`NOW()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`NOW()`),
+});
 export const registrationStatusEnum = pgEnum("registration_status", ["pending", "confirmed", "cancelled"]);
 export const clientStatusEnum = pgEnum("client_status", ["active", "update", "expired"]);
 
@@ -33,7 +44,10 @@ export const users = pgTable("users", {
 export const classes = pgTable("classes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
-  type: classTypeEnum("type").notNull(),
+  type: classTypeEnum("type").notNull(), // Keep for backward compatibility
+  classTypeId: varchar("class_type_id").references(() => classTypes.id), // New flexible reference
+  description: text("description"), // Detailed class description
+  image: text("image"), // File path or external URL for class image
   date: date("date").notNull(),
   time: text("time").notNull(),
   duration: text("duration").notNull(),
@@ -98,8 +112,18 @@ export const upsertUserSchema = createInsertSchema(users).pick({
   role: true,
 });
 
+export const insertClassTypeSchema = createInsertSchema(classTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertClassSchema = createInsertSchema(classes).omit({
   id: true,
+}).partial({
+  classTypeId: true, // Make optional for backward compatibility
+  description: true,
+  image: true,
 });
 
 export const insertRegistrationSchema = createInsertSchema(registrations).omit({
@@ -131,6 +155,9 @@ export const insertClientSchema = createInsertSchema(clients).omit({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export type InsertClassType = z.infer<typeof insertClassTypeSchema>;
+export type ClassType = typeof classTypes.$inferSelect;
 
 export type InsertClass = z.infer<typeof insertClassSchema>;
 export type Class = typeof classes.$inferSelect;

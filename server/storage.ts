@@ -1,7 +1,7 @@
-import { type User, type InsertUser, type UpsertUser, type Class, type InsertClass, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode, type Client, type InsertClient } from "@shared/schema";
+import { type User, type InsertUser, type UpsertUser, type Class, type InsertClass, type ClassType, type InsertClassType, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode, type Client, type InsertClient } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, classes, registrations, discountCodes, clients } from "@shared/schema";
+import { users, classes, classTypes, registrations, discountCodes, clients } from "@shared/schema";
 import { eq, sql, and, lt } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
@@ -21,9 +21,18 @@ export interface IStorage {
   updateUserRole(id: string, role: "user" | "admin"): Promise<User | undefined>;
   deleteUser(id: string): Promise<{ success: boolean; error?: string; registrationCount?: number }>;
   
+  // Class Type CRUD operations
+  getClassTypes(): Promise<ClassType[]>;
+  getClassTypeById(id: string): Promise<ClassType | undefined>;
+  getClassTypeByName(name: string): Promise<ClassType | undefined>;
+  createClassType(classType: InsertClassType): Promise<ClassType>;
+  updateClassType(id: string, updates: Partial<InsertClassType>): Promise<ClassType | undefined>;
+  deleteClassType(id: string): Promise<{ success: boolean; error?: string; classCount?: number }>;
+  
   // Class CRUD operations
   getClasses(): Promise<Class[]>;
   getClassById(id: string): Promise<Class | undefined>;
+  getClassesGroupedByType(): Promise<{ classType: ClassType; classes: Class[] }[]>;
   createClass(classData: InsertClass): Promise<Class>;
   updateClass(id: string, updates: Partial<InsertClass>): Promise<Class | undefined>;
   deleteClass(id: string): Promise<{ success: boolean; error?: string; registrationCount?: number }>;
@@ -59,6 +68,7 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private classes: Map<string, Class>;
+  private classTypes: Map<string, ClassType>;
   private registrations: Map<string, Registration>;
   private discountCodes: Map<string, DiscountCode>;
   private clients: Map<string, Client>;
@@ -66,9 +76,41 @@ export class MemStorage implements IStorage {
   constructor() {
     this.users = new Map();
     this.classes = new Map();
+    this.classTypes = new Map();
     this.registrations = new Map();
     this.discountCodes = new Map();
     this.clients = new Map();
+    
+    // Initialize default class types for backward compatibility
+    this.initializeDefaultClassTypes();
+  }
+
+  // Initialize default class types to maintain compatibility with existing enum
+  private initializeDefaultClassTypes() {
+    const defaultTypes: ClassType[] = [
+      {
+        id: "bls-default",
+        name: "BLS",
+        displayName: "Basic Life Support",
+        description: "Basic Life Support certification for healthcare providers",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: "heartsaver-default",
+        name: "Heartsaver",
+        displayName: "Heartsaver CPR/AED",
+        description: "Heartsaver CPR and AED training for lay rescuers",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+    
+    defaultTypes.forEach(type => {
+      this.classTypes.set(type.id, type);
+    });
   }
 
   // Helper function to generate random discount code in ABCD-EFGH format
@@ -167,6 +209,64 @@ export class MemStorage implements IStorage {
     return { success: deleted };
   }
 
+  // Class Type CRUD operations
+  async getClassTypes(): Promise<ClassType[]> {
+    return Array.from(this.classTypes.values());
+  }
+
+  async getClassTypeById(id: string): Promise<ClassType | undefined> {
+    return this.classTypes.get(id);
+  }
+
+  async getClassTypeByName(name: string): Promise<ClassType | undefined> {
+    return Array.from(this.classTypes.values()).find(type => type.name === name);
+  }
+
+  async createClassType(insertClassType: InsertClassType): Promise<ClassType> {
+    const id = randomUUID();
+    const classType: ClassType = { 
+      ...insertClassType, 
+      id,
+      description: insertClassType.description ?? null,
+      isActive: insertClassType.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.classTypes.set(id, classType);
+    return classType;
+  }
+
+  async updateClassType(id: string, updates: Partial<InsertClassType>): Promise<ClassType | undefined> {
+    const existingClassType = this.classTypes.get(id);
+    if (!existingClassType) {
+      return undefined;
+    }
+    
+    const updatedClassType: ClassType = { 
+      ...existingClassType, 
+      ...updates,
+      updatedAt: new Date()
+    };
+    this.classTypes.set(id, updatedClassType);
+    return updatedClassType;
+  }
+
+  async deleteClassType(id: string): Promise<{ success: boolean; error?: string; classCount?: number }> {
+    // Check for existing classes first
+    const relatedClasses = Array.from(this.classes.values()).filter(cls => cls.classTypeId === id);
+    
+    if (relatedClasses.length > 0) {
+      return {
+        success: false,
+        error: `Cannot delete class type - ${relatedClasses.length} class${relatedClasses.length > 1 ? 'es are' : ' is'} using this type. Please update or delete the classes first.`,
+        classCount: relatedClasses.length
+      };
+    }
+    
+    const deleted = this.classTypes.delete(id);
+    return { success: deleted };
+  }
+
   // Class CRUD operations
   async getClasses(): Promise<Class[]> {
     return Array.from(this.classes.values());
@@ -176,9 +276,32 @@ export class MemStorage implements IStorage {
     return this.classes.get(id);
   }
 
+  async getClassesGroupedByType(): Promise<{ classType: ClassType; classes: Class[] }[]> {
+    const allClasses = Array.from(this.classes.values());
+    const allClassTypes = Array.from(this.classTypes.values()).filter(type => type.isActive);
+    
+    return allClassTypes.map(classType => {
+      // Group classes by both the legacy 'type' field and the new 'classTypeId' field
+      const classesForType = allClasses.filter(cls => 
+        cls.type === classType.name || cls.classTypeId === classType.id
+      );
+      
+      return {
+        classType,
+        classes: classesForType
+      };
+    });
+  }
+
   async createClass(insertClass: InsertClass): Promise<Class> {
     const id = randomUUID();
-    const classData: Class = { ...insertClass, id };
+    const classData: Class = { 
+      ...insertClass, 
+      id,
+      description: insertClass.description ?? null,
+      image: insertClass.image ?? null,
+      classTypeId: insertClass.classTypeId ?? null
+    };
     this.classes.set(id, classData);
     return classData;
   }
@@ -550,6 +673,62 @@ export class DbStorage implements IStorage {
     }
   }
 
+  // Class Type CRUD operations
+  async getClassTypes(): Promise<ClassType[]> {
+    return await db.select().from(classTypes);
+  }
+
+  async getClassTypeById(id: string): Promise<ClassType | undefined> {
+    const result = await db.select().from(classTypes).where(eq(classTypes.id, id));
+    return result[0];
+  }
+
+  async getClassTypeByName(name: string): Promise<ClassType | undefined> {
+    const result = await db.select().from(classTypes).where(eq(classTypes.name, name));
+    return result[0];
+  }
+
+  async createClassType(insertClassType: InsertClassType): Promise<ClassType> {
+    const result = await db.insert(classTypes).values(insertClassType).returning();
+    return result[0];
+  }
+
+  async updateClassType(id: string, updates: Partial<InsertClassType>): Promise<ClassType | undefined> {
+    const result = await db
+      .update(classTypes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(classTypes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteClassType(id: string): Promise<{ success: boolean; error?: string; classCount?: number }> {
+    try {
+      // Check for existing classes first
+      const relatedClasses = await db.select().from(classes).where(eq(classes.classTypeId, id));
+      
+      if (relatedClasses.length > 0) {
+        return {
+          success: false,
+          error: `Cannot delete class type - ${relatedClasses.length} class${relatedClasses.length > 1 ? 'es are' : ' is'} using this type. Please update or delete the classes first.`,
+          classCount: relatedClasses.length
+        };
+      }
+      
+      const result = await db.delete(classTypes).where(eq(classTypes.id, id));
+      return { success: (result.rowCount ?? 0) > 0 };
+    } catch (error) {
+      // Handle potential foreign key constraint errors
+      if (error instanceof Error && error.message.includes('foreign key constraint')) {
+        return {
+          success: false,
+          error: "Cannot delete class type due to existing classes. Please update or delete the classes first."
+        };
+      }
+      throw error; // Re-throw other errors
+    }
+  }
+
   // Class CRUD operations
   async getClasses(): Promise<Class[]> {
     return await db.select().from(classes);
@@ -558,6 +737,26 @@ export class DbStorage implements IStorage {
   async getClassById(id: string): Promise<Class | undefined> {
     const result = await db.select().from(classes).where(eq(classes.id, id));
     return result[0];
+  }
+
+  async getClassesGroupedByType(): Promise<{ classType: ClassType; classes: Class[] }[]> {
+    // Get all active class types
+    const allClassTypes = await db.select().from(classTypes).where(eq(classTypes.isActive, true));
+    
+    // Get all classes
+    const allClasses = await db.select().from(classes);
+    
+    // Group classes by type
+    return allClassTypes.map(classType => {
+      const classesForType = allClasses.filter(cls => 
+        cls.type === classType.name || cls.classTypeId === classType.id
+      );
+      
+      return {
+        classType,
+        classes: classesForType
+      };
+    });
   }
 
   async createClass(insertClass: InsertClass): Promise<Class> {

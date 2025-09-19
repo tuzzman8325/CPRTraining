@@ -55,7 +55,9 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Class, InsertClass, insertClassSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema, Client, InsertClient, insertClientSchema, User } from '@shared/schema';
+import { Class, InsertClass, insertClassSchema, ClassType, InsertClassType, insertClassTypeSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema, Client, InsertClient, insertClientSchema, User } from '@shared/schema';
+import { ImageSelector } from '@/components/ui/image-selector';
+import { Textarea } from '@/components/ui/textarea';
 import { z } from 'zod';
 
 // Enriched Registration type with discount code information
@@ -113,6 +115,17 @@ interface UsersResponse {
 interface UserResponse {
   success: boolean;
   user: User;
+  message: string;
+}
+
+interface ClassTypesResponse {
+  success: boolean;
+  classTypes: ClassType[];
+}
+
+interface ClassTypeResponse {
+  success: boolean;
+  classType: ClassType;
   message: string;
 }
 
@@ -195,6 +208,12 @@ export default function AdminDashboard() {
   const [selectedUserForDeletion, setSelectedUserForDeletion] = useState<User | null>(null);
   const [isDeleteUserDialogOpen, setIsDeleteUserDialogOpen] = useState(false);
 
+  // Class Type Management state
+  const [classTypeSearchTerm, setClassTypeSearchTerm] = useState('');
+  const [selectedClassType, setSelectedClassType] = useState<ClassType | null>(null);
+  const [isAddClassTypeDialogOpen, setIsAddClassTypeDialogOpen] = useState(false);
+  const [isEditClassTypeDialogOpen, setIsEditClassTypeDialogOpen] = useState(false);
+
   // Roster state
   const [isGeneratingRoster, setIsGeneratingRoster] = useState(false);
   
@@ -225,11 +244,17 @@ export default function AdminDashboard() {
   const { data: usersData, isLoading: usersLoading } = useQuery<UsersResponse>({
     queryKey: ['/api/users'],
   });
+
+  // React Query hooks for class types
+  const { data: classTypesData, isLoading: classTypesLoading } = useQuery<ClassTypesResponse>({
+    queryKey: ['/api/class-types'],
+  });
   
   const clients: Client[] = clientsData?.clients || [];
   const classes: Class[] = classesData?.classes || [];
   const discountCodes: DiscountCode[] = discountCodesData?.discountCodes || [];
   const users: User[] = usersData?.users || [];
+  const classTypes: ClassType[] = classTypesData?.classTypes || [];
   
   const createClassMutation = useMutation({
     mutationFn: async (data: InsertClass) => {
@@ -464,10 +489,75 @@ export default function AdminDashboard() {
       });
     }
   });
+
+  // Class Type mutations
+  const createClassTypeMutation = useMutation({
+    mutationFn: async (data: InsertClassType) => {
+      return await apiRequest('POST', '/api/class-types', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/class-types'] });
+      setIsAddClassTypeDialogOpen(false);
+      toast({ title: "Success", description: "Class type created successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to create class type: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const updateClassTypeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InsertClassType> }) => {
+      return await apiRequest('PUT', `/api/class-types/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/class-types'] });
+      setIsEditClassTypeDialogOpen(false);
+      setSelectedClassType(null);
+      toast({ title: "Success", description: "Class type updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to update class type: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const deleteClassTypeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/class-types/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/class-types'] });
+      toast({ title: "Success", description: "Class type deleted successfully" });
+    },
+    onError: (error: any) => {
+      let errorMessage = "Failed to delete class type";
+      
+      if (error.response?.status === 409) {
+        const errorData = error.response.data;
+        if (errorData.classCount) {
+          errorMessage = `Cannot delete class type - ${errorData.classCount} class${errorData.classCount > 1 ? 'es are' : ' is'} using this type. Please reassign all classes first.`;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else {
+          errorMessage = "Cannot delete class type due to existing classes. Please reassign all classes first.";
+        }
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else {
+        errorMessage = `Failed to delete class type: ${error.message}`;
+      }
+      
+      toast({ 
+        title: "Cannot Delete Class Type", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
+    }
+  });
   
   // Form setup for adding classes
   const addClassForm = useForm<InsertClass>({
     resolver: zodResolver(insertClassSchema.extend({
+      description: z.string().min(10, "Description must be at least 10 characters").optional(),
       date: insertClassSchema.shape.date.refine(
         (date) => {
           const inputDate = new Date(date + 'T00:00:00');
@@ -484,6 +574,9 @@ export default function AdminDashboard() {
     defaultValues: {
       title: '',
       type: 'BLS',
+      classTypeId: '',
+      description: '',
+      image: '',
       date: '',
       time: '',
       duration: '',
@@ -496,6 +589,7 @@ export default function AdminDashboard() {
   // Form setup for editing classes
   const editClassForm = useForm<InsertClass>({
     resolver: zodResolver(insertClassSchema.extend({
+      description: z.string().min(10, "Description must be at least 10 characters").optional(),
       date: insertClassSchema.shape.date.refine(
         (date) => {
           const inputDate = new Date(date + 'T00:00:00');
@@ -589,6 +683,26 @@ export default function AdminDashboard() {
     })),
   });
 
+  // Form setup for adding class types
+  const addClassTypeForm = useForm<InsertClassType>({
+    resolver: zodResolver(insertClassTypeSchema.extend({
+      description: z.string().optional(),
+    })),
+    defaultValues: {
+      name: '',
+      displayName: '',
+      description: '',
+      isActive: true
+    }
+  });
+
+  // Form setup for editing class types
+  const editClassTypeForm = useForm<InsertClassType>({
+    resolver: zodResolver(insertClassTypeSchema.extend({
+      description: z.string().optional(),
+    })),
+  });
+
   // Helper function for date filtering
   const getDateRangeFilter = (range: string, date: string) => {
     if (range === 'all' || !date) return true;
@@ -677,6 +791,12 @@ export default function AdminDashboard() {
     code.createdBy.toLowerCase().includes(discountCodeSearchTerm.toLowerCase())
   );
 
+  const filteredClassTypes = classTypes.filter(classType =>
+    classType.name.toLowerCase().includes(classTypeSearchTerm.toLowerCase()) ||
+    classType.displayName.toLowerCase().includes(classTypeSearchTerm.toLowerCase()) ||
+    (classType.description && classType.description.toLowerCase().includes(classTypeSearchTerm.toLowerCase()))
+  );
+
   // Client handlers
   const handleEdit = (client: Client) => {
     // Always find the latest client data from the current clients list
@@ -732,7 +852,10 @@ export default function AdminDashboard() {
       duration: classItem.duration,
       capacity: classItem.capacity,
       available: classItem.available,
-      price: classItem.price
+      price: classItem.price,
+      image: classItem.image || '',
+      description: classItem.description || '',
+      classTypeId: classItem.classTypeId || ''
     });
     setIsEditClassDialogOpen(true);
   };
@@ -791,6 +914,39 @@ export default function AdminDashboard() {
   const onEditDiscountCodeSubmit = (data: InsertDiscountCode) => {
     if (selectedDiscountCode) {
       updateDiscountCodeMutation.mutate({ id: selectedDiscountCode.id, data });
+    }
+  };
+
+  // Class Type handlers
+  const handleAddClassType = () => {
+    addClassTypeForm.reset();
+    setIsAddClassTypeDialogOpen(true);
+  };
+
+  const handleEditClassType = (classType: ClassType) => {
+    setSelectedClassType(classType);
+    editClassTypeForm.reset({
+      name: classType.name,
+      displayName: classType.displayName,
+      description: classType.description || '',
+      isActive: classType.isActive
+    });
+    setIsEditClassTypeDialogOpen(true);
+  };
+
+  const handleDeleteClassType = (classTypeId: string) => {
+    if (window.confirm('Are you sure you want to delete this class type? This action cannot be undone.')) {
+      deleteClassTypeMutation.mutate(classTypeId);
+    }
+  };
+
+  const onAddClassTypeSubmit = (data: InsertClassType) => {
+    createClassTypeMutation.mutate(data);
+  };
+
+  const onEditClassTypeSubmit = (data: InsertClassType) => {
+    if (selectedClassType) {
+      updateClassTypeMutation.mutate({ id: selectedClassType.id, data });
     }
   };
 
@@ -1989,6 +2145,134 @@ export default function AdminDashboard() {
           </Card>
         </Collapsible>
 
+        {/* Class Type Management */}
+        <Collapsible open={openSection === 'class-types'} onOpenChange={() => toggleSection('class-types')}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <CardTitle className="text-lg">Class Type Management</CardTitle>
+                      <CardDescription>
+                        Manage available class types and categories
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <Badge variant="outline" className="hidden sm:inline-flex">
+                      {filteredClassTypes.length} types
+                    </Badge>
+                    {openSection === 'class-types' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Search class types..."
+                      value={classTypeSearchTerm}
+                      onChange={(e) => setClassTypeSearchTerm(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-search-class-types"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleAddClassType}
+                    disabled={createClassTypeMutation.isPending}
+                    data-testid="button-add-class-type"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Class Type
+                  </Button>
+                </div>
+
+                {classTypesLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading class types...</p>
+                    </div>
+                  </div>
+                ) : filteredClassTypes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No class types found</p>
+                    {classTypeSearchTerm && (
+                      <p className="text-sm mt-2">Try adjusting your search criteria</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Display Name</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredClassTypes.map((classType) => (
+                          <TableRow key={classType.id}>
+                            <TableCell className="font-medium" data-testid={`text-class-type-name-${classType.id}`}>
+                              {classType.name}
+                            </TableCell>
+                            <TableCell>{classType.displayName}</TableCell>
+                            <TableCell className="max-w-xs truncate">
+                              {classType.description || '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={classType.isActive ? 'default' : 'secondary'}>
+                                {classType.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(classType.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" data-testid={`button-actions-${classType.id}`}>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditClassType(classType)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteClassType(classType.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
         {/* Class Details Dialog */}
         <Dialog open={isClassDetailsDialogOpen} onOpenChange={setIsClassDetailsDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="dialog-class-details">
@@ -2400,7 +2684,7 @@ export default function AdminDashboard() {
 
         {/* Add Class Dialog */}
         <Dialog open={isAddClassDialogOpen} onOpenChange={setIsAddClassDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Class</DialogTitle>
               <DialogDescription>
@@ -2437,10 +2721,69 @@ export default function AdminDashboard() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="BLS">BLS Provider</SelectItem>
-                          <SelectItem value="Heartsaver">Heartsaver CPR</SelectItem>
+                          {classTypesLoading ? (
+                            <SelectItem value="" disabled>Loading class types...</SelectItem>
+                          ) : classTypes.filter(ct => ct.isActive).length > 0 ? (
+                            classTypes.filter(ct => ct.isActive).map((classType) => (
+                              <SelectItem key={classType.id} value={classType.name}>
+                                {classType.displayName}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>No active class types available</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={addClassForm.control}
+                  name="classTypeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Class Type (Advanced)</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-add-classtype">
+                            <SelectValue placeholder="Select detailed class type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {classTypesLoading ? (
+                            <SelectItem value="" disabled>Loading class types...</SelectItem>
+                          ) : classTypes.filter(ct => ct.isActive).length > 0 ? (
+                            classTypes.filter(ct => ct.isActive).map((classType) => (
+                              <SelectItem key={classType.id} value={classType.id}>
+                                {classType.displayName}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>No active class types available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={addClassForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          {...field} 
+                          placeholder="Enter a detailed description of the class content, requirements, and objectives..." 
+                          className="min-h-[100px]"
+                          data-testid="textarea-add-description"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -2549,6 +2892,13 @@ export default function AdminDashboard() {
                     </FormItem>
                   )}
                 />
+
+                <ImageSelector
+                  control={addClassForm.control}
+                  name="image"
+                  label="Class Image"
+                  placeholder="Select an image for this class"
+                />
                 
                 <DialogFooter>
                   <Button 
@@ -2566,7 +2916,7 @@ export default function AdminDashboard() {
 
         {/* Edit Class Dialog */}
         <Dialog open={isEditClassDialogOpen} onOpenChange={setIsEditClassDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Class</DialogTitle>
               <DialogDescription>
@@ -2604,10 +2954,69 @@ export default function AdminDashboard() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="BLS">BLS Provider</SelectItem>
-                            <SelectItem value="Heartsaver">Heartsaver CPR</SelectItem>
+                            {classTypesLoading ? (
+                              <SelectItem value="" disabled>Loading class types...</SelectItem>
+                            ) : classTypes.filter(ct => ct.isActive).length > 0 ? (
+                              classTypes.filter(ct => ct.isActive).map((classType) => (
+                                <SelectItem key={classType.id} value={classType.name}>
+                                  {classType.displayName}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="" disabled>No active class types available</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editClassForm.control}
+                    name="classTypeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Class Type (Advanced)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-edit-classtype">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {classTypesLoading ? (
+                              <SelectItem value="" disabled>Loading class types...</SelectItem>
+                            ) : classTypes.filter(ct => ct.isActive).length > 0 ? (
+                              classTypes.filter(ct => ct.isActive).map((classType) => (
+                                <SelectItem key={classType.id} value={classType.id}>
+                                  {classType.displayName}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="" disabled>No active class types available</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editClassForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            placeholder="Enter a detailed description of the class content, requirements, and objectives..." 
+                            className="min-h-[100px]"
+                            data-testid="textarea-edit-description"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -2703,6 +3112,13 @@ export default function AdminDashboard() {
                         <FormMessage />
                       </FormItem>
                     )}
+                  />
+
+                  <ImageSelector
+                    control={editClassForm.control}
+                    name="image"
+                    label="Class Image"
+                    placeholder="Select an image for this class"
                   />
                   
                   <DialogFooter>
@@ -3148,6 +3564,226 @@ export default function AdminDashboard() {
                 </DialogFooter>
               </form>
             </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Class Type Dialog */}
+        <Dialog open={isAddClassTypeDialogOpen} onOpenChange={setIsAddClassTypeDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Class Type</DialogTitle>
+              <DialogDescription>
+                Create a new class type for organizing your training classes.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Form {...addClassTypeForm}>
+              <form onSubmit={addClassTypeForm.handleSubmit(onAddClassTypeSubmit)} className="space-y-4">
+                <FormField
+                  control={addClassTypeForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. BLS, Heartsaver, FirstAid" data-testid="input-add-classtype-name" />
+                      </FormControl>
+                      <FormDescription>
+                        Short, unique identifier for this class type
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={addClassTypeForm.control}
+                  name="displayName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. Basic Life Support, Heartsaver CPR/AED" data-testid="input-add-classtype-displayname" />
+                      </FormControl>
+                      <FormDescription>
+                        Full name shown to users
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={addClassTypeForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          {...field} 
+                          placeholder="Describe this class type and its purpose..." 
+                          className="min-h-[80px]"
+                          data-testid="textarea-add-classtype-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={addClassTypeForm.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Active</FormLabel>
+                        <FormDescription>
+                          Active class types are available for creating new classes
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-add-classtype-active"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                <DialogFooter>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAddClassTypeDialogOpen(false)}
+                    data-testid="button-cancel-add-classtype"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createClassTypeMutation.isPending}
+                    data-testid="button-submit-add-classtype"
+                  >
+                    {createClassTypeMutation.isPending ? 'Creating...' : 'Create Class Type'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Class Type Dialog */}
+        <Dialog open={isEditClassTypeDialogOpen} onOpenChange={setIsEditClassTypeDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Class Type</DialogTitle>
+              <DialogDescription>
+                Update class type information and settings.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedClassType && (
+              <Form {...editClassTypeForm}>
+                <form onSubmit={editClassTypeForm.handleSubmit(onEditClassTypeSubmit)} className="space-y-4">
+                  <FormField
+                    control={editClassTypeForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-edit-classtype-name" />
+                        </FormControl>
+                        <FormDescription>
+                          Short, unique identifier for this class type
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editClassTypeForm.control}
+                    name="displayName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Display Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-edit-classtype-displayname" />
+                        </FormControl>
+                        <FormDescription>
+                          Full name shown to users
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editClassTypeForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            placeholder="Describe this class type and its purpose..." 
+                            className="min-h-[80px]"
+                            data-testid="textarea-edit-classtype-description"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editClassTypeForm.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Active</FormLabel>
+                          <FormDescription>
+                            Active class types are available for creating new classes
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-edit-classtype-active"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter>
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsEditClassTypeDialogOpen(false)}
+                      data-testid="button-cancel-edit-classtype"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={updateClassTypeMutation.isPending}
+                      data-testid="button-submit-edit-classtype"
+                    >
+                      {updateClassTypeMutation.isPending ? 'Updating...' : 'Update Class Type'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            )}
           </DialogContent>
         </Dialog>
 

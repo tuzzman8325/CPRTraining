@@ -10,11 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, Calendar as CalendarIcon, BookOpen, Phone, Mail } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { Class } from '@shared/schema';
-import { format } from 'date-fns';
+import { Class, ClassType } from '@shared/schema';
 import { parseLocalDate } from '@/lib/utils';
-import blsImage from '@assets/generated_images/BLS_provider_training_a0cd6457.png';
-import heartsaverImage from '@assets/generated_images/Heartsaver_community_training_b3867bec.png';
 
 export default function Home() {
   // Registration dialog state
@@ -22,39 +19,34 @@ export default function Home() {
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [, setLocation] = useLocation();
 
-  // Fetch classes data
-  const { data: classesResponse, isLoading } = useQuery<{ success: boolean; classes: Class[] }>({
-    queryKey: ['/api/classes'],
+  // Fetch class types with their classes
+  const { data: groupedClassesResponse, isLoading } = useQuery<{ 
+    success: boolean; 
+    groupedClasses: { classType: ClassType; classes: Class[] }[] 
+  }>({
+    queryKey: ['/api/classes/grouped-by-type'],
   });
 
-  const classes = classesResponse?.classes || [];
+  const groupedClasses = groupedClassesResponse?.groupedClasses || [];
 
   // Process classes to find next upcoming class for each type
-  const getNextClass = (type: 'BLS' | 'Heartsaver') => {
+  const getNextUpcomingClass = (classes: Class[]) => {
     const today = new Date();
-    // Set to start of day to properly compare with class dates
     today.setHours(0, 0, 0, 0);
     
-    const typeClasses = classes
-      .filter(c => c.type === type)
+    const upcomingClasses = classes
       .filter(c => {
         const classDate = parseLocalDate(c.date);
         return classDate >= today;
       })
       .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
     
-    return typeClasses[0] || null;
+    return upcomingClasses[0] || null;
   };
 
-  const nextBLSClass = getNextClass('BLS');
-  const nextHeartsaverClass = getNextClass('Heartsaver');
-
-  const handleClassRegister = (type: string) => {
-    // Find the next available class of the selected type
-    const targetClass = type === 'BLS' ? nextBLSClass : nextHeartsaverClass;
-    
-    if (targetClass && targetClass.available > 0) {
-      setSelectedClass(targetClass);
+  const handleClassRegister = (nextClass: Class | null) => {
+    if (nextClass && nextClass.available > 0) {
+      setSelectedClass(nextClass);
       setIsRegistrationOpen(true);
     } else {
       // Navigate to classes page if no available class found
@@ -62,7 +54,7 @@ export default function Home() {
     }
   };
 
-  const handleClassLearnMore = (type: string) => {
+  const handleClassLearnMore = () => {
     // Navigate to the detailed classes page
     setLocation('/classes');
   };
@@ -109,72 +101,30 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-12">
+            <div className={`grid gap-8 max-w-6xl mx-auto mb-12 ${groupedClasses.length <= 2 ? 'md:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
               {isLoading ? (
-                <>
-                  <ClassCardSkeleton />
-                  <ClassCardSkeleton />
-                </>
+                Array.from({ length: 3 }).map((_, index) => (
+                  <ClassCardSkeleton key={index} />
+                ))
+              ) : groupedClasses.length === 0 ? (
+                <div className="col-span-full text-center py-12">
+                  <CalendarIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="text-xl font-semibold mb-2 text-foreground">No Class Types Available</h3>
+                  <p className="text-muted-foreground">Check back soon for upcoming training opportunities.</p>
+                </div>
               ) : (
-                <>
-                  {/* BLS Class Card */}
-                  {nextBLSClass ? (
+                groupedClasses.map((group) => {
+                  const nextClass = getNextUpcomingClass(group.classes);
+                  return (
                     <ClassCard
-                      title={nextBLSClass.title}
-                      description={`Advanced life support training for healthcare professionals, first responders, and emergency medical personnel. Includes high-quality CPR, use of bag-mask device, and team-based resuscitation. ${nextBLSClass.capacity - nextBLSClass.available} students enrolled, ${nextBLSClass.available} spots remaining.`}
-                      duration={nextBLSClass.duration}
-                      capacity={nextBLSClass.capacity}
-                      price={nextBLSClass.price}
-                      nextDate={`${format(parseLocalDate(nextBLSClass.date), 'MMMM d, yyyy')} at ${nextBLSClass.time}`}
-                      image={blsImage}
-                      type="BLS"
-                      onRegister={() => handleClassRegister('BLS')}
-                      onLearnMore={() => handleClassLearnMore('BLS')}
+                      key={group.classType.id}
+                      classType={group.classType}
+                      nextClass={nextClass}
+                      onRegister={() => handleClassRegister(nextClass)}
+                      onLearnMore={handleClassLearnMore}
                     />
-                  ) : (
-                    <ClassCard
-                      title="BLS Provider"
-                      description="Advanced life support training for healthcare professionals, first responders, and emergency medical personnel. Includes high-quality CPR, use of bag-mask device, and team-based resuscitation."
-                      duration="4 hours"
-                      capacity={12}
-                      price={85}
-                      nextDate="No upcoming classes scheduled"
-                      image={blsImage}
-                      type="BLS"
-                      onRegister={() => handleClassRegister('BLS')}
-                      onLearnMore={() => handleClassLearnMore('BLS')}
-                    />
-                  )}
-                  
-                  {/* Heartsaver Class Card */}
-                  {nextHeartsaverClass ? (
-                    <ClassCard
-                      title={nextHeartsaverClass.title}
-                      description={`Essential CPR and AED training for community members, teachers, coaches, and lay rescuers. Perfect for those who want to learn life-saving skills for family and community. ${nextHeartsaverClass.capacity - nextHeartsaverClass.available} students enrolled, ${nextHeartsaverClass.available} spots remaining.`}
-                      duration={nextHeartsaverClass.duration}
-                      capacity={nextHeartsaverClass.capacity}
-                      price={nextHeartsaverClass.price}
-                      nextDate={`${format(parseLocalDate(nextHeartsaverClass.date), 'MMMM d, yyyy')} at ${nextHeartsaverClass.time}`}
-                      image={heartsaverImage}
-                      type="Heartsaver"
-                      onRegister={() => handleClassRegister('Heartsaver')}
-                      onLearnMore={() => handleClassLearnMore('Heartsaver')}
-                    />
-                  ) : (
-                    <ClassCard
-                      title="Heartsaver CPR"
-                      description="Essential CPR and AED training for community members, teachers, coaches, and lay rescuers. Perfect for those who want to learn life-saving skills for family and community."
-                      duration="3 hours"
-                      capacity={16}
-                      price={65}
-                      nextDate="No upcoming classes scheduled"
-                      image={heartsaverImage}
-                      type="Heartsaver"
-                      onRegister={() => handleClassRegister('Heartsaver')}
-                      onLearnMore={() => handleClassLearnMore('Heartsaver')}
-                    />
-                  )}
-                </>
+                  );
+                })
               )}
             </div>
 

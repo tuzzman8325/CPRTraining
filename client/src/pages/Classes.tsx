@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -6,7 +6,12 @@ import ClassRegistrationDialog from '@/components/ClassRegistrationDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { 
   Clock, 
   Users, 
@@ -14,115 +19,189 @@ import {
   CheckCircle, 
   Calendar,
   DollarSign,
-  Heart,
-  Stethoscope,
-  Loader2
+  Loader2,
+  ChevronDown,
+  MapPin
 } from 'lucide-react';
-import { Class } from '@shared/schema';
+import { Class, ClassType } from '@shared/schema';
 import { parseLocalDate } from '@/lib/utils';
-import blsImage from '@assets/generated_images/BLS_provider_training_a0cd6457.png';
-import heartsaverImage from '@assets/generated_images/Heartsaver_community_training_b3867bec.png';
+
+// ClassCard component for individual classes within each type section
+function ClassCard({ classData, onRegister }: { classData: Class; onRegister: (classData: Class) => void }) {
+  const formatPrice = (priceInCents: number) => {
+    if (priceInCents === 1) return 'Contact for pricing';
+    return `$${(priceInCents / 100).toFixed(2)}`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = parseLocalDate(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'short',
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const isUpcoming = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const classDate = parseLocalDate(classData.date);
+    return classDate >= today;
+  };
+
+  const isAvailable = classData.available > 0;
+  const upcoming = isUpcoming();
+
+  return (
+    <Card className={`hover-elevate ${!upcoming ? 'opacity-75' : ''}`} data-testid={`card-class-${classData.id}`}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg mb-2" data-testid={`text-class-title-${classData.id}`}>
+              {classData.title}
+            </CardTitle>
+            {classData.description && (
+              <CardDescription className="line-clamp-2" data-testid={`text-class-description-${classData.id}`}>
+                {classData.description}
+              </CardDescription>
+            )}
+          </div>
+          <Badge variant={upcoming ? "default" : "secondary"} className="ml-2">
+            {upcoming ? "Upcoming" : "Past"}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {classData.image && (
+          <div className="aspect-video overflow-hidden rounded-md">
+            <img 
+              src={classData.image}
+              alt={classData.title}
+              className="w-full h-full object-cover"
+              data-testid={`img-class-${classData.id}`}
+            />
+          </div>
+        )}
+        
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            <span data-testid={`text-class-date-${classData.id}`}>{formatDate(classData.date)}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Clock className="h-4 w-4 text-primary" />
+            <span data-testid={`text-class-time-${classData.id}`}>{classData.time}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Users className="h-4 w-4 text-primary" />
+            <span data-testid={`text-class-capacity-${classData.id}`}>
+              {classData.available} of {classData.capacity} spots
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <DollarSign className="h-4 w-4 text-primary" />
+            <span data-testid={`text-class-price-${classData.id}`}>{formatPrice(classData.price)}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 text-sm">
+          <Clock className="h-4 w-4 text-primary" />
+          <span>Duration: {classData.duration}</span>
+        </div>
+
+        <Button 
+          onClick={() => onRegister(classData)}
+          className="w-full"
+          data-testid={`button-register-${classData.id}`}
+          disabled={!upcoming || !isAvailable}
+        >
+          {!upcoming ? (
+            "Class Completed"
+          ) : !isAvailable ? (
+            "Class Full - Contact for Waitlist"
+          ) : (
+            `Register (${classData.available} spots remaining)`
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Empty state component for class types with no classes
+function EmptyClassTypeState({ classType }: { classType: ClassType }) {
+  return (
+    <Card className="text-center py-8" data-testid={`empty-state-${classType.id}`}>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="text-muted-foreground">
+            <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <h3 className="text-lg font-semibold mb-2">No {classType.displayName} Classes Scheduled</h3>
+            <p className="text-sm max-w-md mx-auto">
+              Currently no upcoming {classType.displayName.toLowerCase()} classes are scheduled. 
+              Contact us to request a new class or check back later for updates.
+            </p>
+          </div>
+          <Button variant="outline" data-testid={`button-contact-${classType.id}`}>
+            Request {classType.displayName} Class
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Classes() {
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
 
-  // Fetch available classes from API
-  const { data: classesData, isLoading } = useQuery({
-    queryKey: ['/api/classes'],
-    select: (response: any) => response.classes,
+  // Fetch classes grouped by type from the new API endpoint
+  const { data: groupedData, isLoading, error } = useQuery({
+    queryKey: ['/api/classes/grouped-by-type'],
+    select: (response: any) => response.groupedClasses,
   });
 
-  const classes = classesData || [];
+  const groupedClasses = groupedData || [];
 
-  // Process classes data to extract course type information
-  const courseInfo = useMemo(() => {
-    const blsClasses = classes.filter((cls: Class) => cls.type === 'BLS');
-    const heartsaverClasses = classes.filter((cls: Class) => cls.type === 'Heartsaver');
-
-    // Helper function to get next upcoming class
-    const getNextClass = (courseClasses: Class[]) => {
-      const today = new Date();
-      // Set to start of day to properly compare with class dates
-      today.setHours(0, 0, 0, 0);
-      
-      const upcoming = courseClasses
-        .filter(cls => {
-          const classDate = parseLocalDate(cls.date);
-          return classDate >= today;
-        })
-        .sort((a, b) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime());
-      
-      return upcoming[0] || null;
-    };
-
-    // Helper function to format price
-    const formatPrice = (priceInCents: number) => {
-      if (priceInCents === 1) return 'Contact for pricing';
-      return `$${(priceInCents / 100).toFixed(2)}`;
-    };
-
-    // Helper function to format date
-    const formatDate = (dateStr: string) => {
-      const date = parseLocalDate(dateStr);
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'long',
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-    };
-
-    const nextBLS = getNextClass(blsClasses);
-    const nextHeartsaver = getNextClass(heartsaverClasses);
-
-    return {
-      BLS: {
-        classes: blsClasses,
-        nextClass: nextBLS,
-        duration: nextBLS?.duration || '4 hours',
-        capacity: nextBLS?.capacity || 12,
-        price: nextBLS ? formatPrice(nextBLS.price) : 'Contact for pricing',
-        enrolled: nextBLS ? nextBLS.capacity - nextBLS.available : 0,
-        available: nextBLS?.available || 0,
-        nextDate: nextBLS ? formatDate(nextBLS.date) : null,
-        nextTime: nextBLS?.time || null,
-        hasUpcoming: !!nextBLS
-      },
-      Heartsaver: {
-        classes: heartsaverClasses,
-        nextClass: nextHeartsaver,
-        duration: nextHeartsaver?.duration || '3 hours',
-        capacity: nextHeartsaver?.capacity || 16,
-        price: nextHeartsaver ? formatPrice(nextHeartsaver.price) : 'Contact for pricing',
-        enrolled: nextHeartsaver ? nextHeartsaver.capacity - nextHeartsaver.available : 0,
-        available: nextHeartsaver?.available || 0,
-        nextDate: nextHeartsaver ? formatDate(nextHeartsaver.date) : null,
-        nextTime: nextHeartsaver?.time || null,
-        hasUpcoming: !!nextHeartsaver
-      }
-    };
-  }, [classes]);
-  
-  const handleRegister = (courseType: string) => {
-    // Find an available class of the selected type
-    const availableClass = classes.find((cls: Class) => 
-      cls.type === courseType && cls.available > 0
-    );
-    
-    if (availableClass) {
-      setSelectedClass(availableClass);
-      setIsRegistrationOpen(true);
-    } else {
-      // For static course info display when no specific class is scheduled
-      console.log(`No available ${courseType} classes currently scheduled`);
-    }
+  const handleRegister = (classData: Class) => {
+    setSelectedClass(classData);
+    setIsRegistrationOpen(true);
   };
 
   const handleRegistrationClose = () => {
     setIsRegistrationOpen(false);
     setSelectedClass(null);
   };
+
+  // Calculate totals for summary
+  const totalClasses = groupedClasses.reduce((total: number, group: any) => total + group.classes.length, 0);
+  const totalUpcomingClasses = groupedClasses.reduce((total: number, group: any) => {
+    const upcomingClasses = group.classes.filter((cls: Class) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const classDate = parseLocalDate(cls.date);
+      return classDate >= today;
+    });
+    return total + upcomingClasses.length;
+  }, 0);
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <Card className="p-8 text-center">
+            <CardContent>
+              <h2 className="text-xl font-semibold mb-2">Error Loading Classes</h2>
+              <p className="text-muted-foreground">Unable to load class information. Please try again later.</p>
+            </CardContent>
+          </Card>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -135,398 +214,165 @@ export default function Classes() {
             <h1 className="text-4xl font-bold mb-4">CPR Training Courses</h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               American Heart Association certified training courses designed to teach life-saving skills. 
-              Choose the course that best fits your professional requirements and skill level.
+              Browse our available course types and register for upcoming classes.
             </p>
+            {!isLoading && (
+              <div className="mt-6 text-sm text-muted-foreground">
+                <span data-testid="text-total-upcoming-classes">{totalUpcomingClasses}</span> upcoming classes available from 
+                <span data-testid="text-total-class-types"> {groupedClasses.length}</span> course types
+              </div>
+            )}
           </div>
         </section>
 
-        {/* Course Details */}
-        <section className="py-16">
-          <div className="container mx-auto px-4 space-y-16">
-            
-            {/* BLS Provider Course */}
-            <div className="max-w-6xl mx-auto">
-              <Card className="overflow-hidden">
-                <div className="grid md:grid-cols-2 gap-0">
-                  <div className="aspect-video md:aspect-auto md:h-full overflow-hidden">
-                    <img 
-                      src={blsImage}
-                      alt="BLS Provider Training"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-8">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Stethoscope className="h-6 w-6 text-primary" />
-                      <Badge className="bg-primary text-primary-foreground">BLS Provider</Badge>
-                    </div>
-                    
-                    <h2 className="text-3xl font-bold mb-4">Basic Life Support for Healthcare Providers</h2>
-                    
-                    <p className="text-muted-foreground mb-6 leading-relaxed">
-                      This course is designed for healthcare professionals and trained first responders who provide care to 
-                      patients in a wide variety of in-facility and prehospital settings. Students learn high-quality CPR 
-                      for adults, children, and infants; use of bag-mask device; and relief of choking.
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="h-4 w-4 text-primary" />
-                        <span className="text-sm" data-testid="text-bls-duration">{courseInfo.BLS.duration}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Users className="h-4 w-4 text-primary" />
-                        <span className="text-sm" data-testid="text-bls-capacity">Max {courseInfo.BLS.capacity} students</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <DollarSign className="h-4 w-4 text-primary" />
-                        <span className="text-sm" data-testid="text-bls-price">{courseInfo.BLS.price}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Award className="h-4 w-4 text-primary" />
-                        <span className="text-sm">2-year certification</span>
-                      </div>
-                    </div>
-
-                    {/* Next Class Information */}
-                    {courseInfo.BLS.hasUpcoming && (
-                      <div className="mb-6 p-4 bg-muted/30 rounded-lg">
-                        <h4 className="font-semibold mb-2 flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-primary" />
-                          <span>Next Class</span>
-                        </h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Date:</span>
-                            <span data-testid="text-bls-next-date">{courseInfo.BLS.nextDate}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Time:</span>
-                            <span data-testid="text-bls-next-time">{courseInfo.BLS.nextTime}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Enrolled:</span>
-                            <span data-testid="text-bls-enrollment">{courseInfo.BLS.enrolled} students</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Available:</span>
-                            <span className={`font-medium ${courseInfo.BLS.available <= 3 ? 'text-orange-600' : 'text-green-600'}`} data-testid="text-bls-available">
-                              {courseInfo.BLS.available} spots remaining
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {!courseInfo.BLS.hasUpcoming && (
-                      <div className="mb-6 p-4 bg-muted/30 rounded-lg">
-                        <h4 className="font-semibold mb-2 flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>No Upcoming Classes</span>
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          Contact us to request a new BLS class or check back later for updated schedule.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="mb-6">
-                      <h4 className="font-semibold mb-3">Course Includes:</h4>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>High-quality CPR for adults, children, and infants</span>
-                        </li>
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Use of automated external defibrillator (AED)</span>
-                        </li>
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Use of bag-mask device</span>
-                        </li>
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Relief of choking in adults, children, and infants</span>
-                        </li>
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Team-based resuscitation scenarios</span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <Button 
-                      onClick={() => handleRegister('BLS')}
-                      size="lg"
-                      className="w-full"
-                      data-testid="button-register-bls"
-                      disabled={isLoading || !courseInfo.BLS.hasUpcoming || courseInfo.BLS.available === 0}
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading Classes...
-                        </>
-                      ) : !courseInfo.BLS.hasUpcoming ? (
-                        "No BLS Classes Scheduled"
-                      ) : courseInfo.BLS.available === 0 ? (
-                        "BLS Classes Full - Contact for Waitlist"
-                      ) : (
-                        `Register for BLS Provider Course (${courseInfo.BLS.available} spots available)`
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </Card>
+        {/* Loading State */}
+        {isLoading && (
+          <section className="py-16">
+            <div className="container mx-auto px-4 text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading class information...</p>
             </div>
+          </section>
+        )}
 
-            <Separator className="max-w-6xl mx-auto" />
-
-            {/* Heartsaver Course */}
-            <div className="max-w-6xl mx-auto">
-              <Card className="overflow-hidden">
-                <div className="grid md:grid-cols-2 gap-0">
-                  <div className="aspect-video md:aspect-auto md:h-full overflow-hidden md:order-2">
-                    <img 
-                      src={heartsaverImage}
-                      alt="Heartsaver CPR Training"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-8 md:order-1">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Heart className="h-6 w-6 text-primary" />
-                      <Badge variant="secondary">Heartsaver</Badge>
-                    </div>
-                    
-                    <h2 className="text-3xl font-bold mb-4">Heartsaver CPR AED</h2>
-                    
-                    <p className="text-muted-foreground mb-6 leading-relaxed">
-                      This course is designed for anyone with little or no medical training who needs a course completion 
-                      card for their job, regulatory requirements, or other reasons, or anyone who wants to be prepared 
-                      for an emergency in any setting.
+        {/* Dynamic Class Type Sections */}
+        {!isLoading && (
+          <section className="py-16">
+            <div className="container mx-auto px-4 max-w-6xl">
+              {groupedClasses.length === 0 ? (
+                <Card className="text-center py-12" data-testid="empty-state-all-classes">
+                  <CardContent>
+                    <Calendar className="h-16 w-16 mx-auto mb-6 opacity-50" />
+                    <h2 className="text-2xl font-semibold mb-4">No Classes Available</h2>
+                    <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                      Currently no classes are scheduled. Please contact us to learn about upcoming training opportunities.
                     </p>
+                    <Button data-testid="button-contact-instructor">Contact Instructor</Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Accordion type="multiple" defaultValue={groupedClasses.map((group: any) => group.classType.id)} className="space-y-4">
+                  {groupedClasses.map((group: any) => {
+                    const { classType, classes } = group;
+                    const upcomingClasses = classes.filter((cls: Class) => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const classDate = parseLocalDate(cls.date);
+                      return classDate >= today;
+                    });
 
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="h-4 w-4 text-primary" />
-                        <span className="text-sm" data-testid="text-heartsaver-duration">{courseInfo.Heartsaver.duration}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Users className="h-4 w-4 text-primary" />
-                        <span className="text-sm" data-testid="text-heartsaver-capacity">Max {courseInfo.Heartsaver.capacity} students</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <DollarSign className="h-4 w-4 text-primary" />
-                        <span className="text-sm" data-testid="text-heartsaver-price">{courseInfo.Heartsaver.price}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Award className="h-4 w-4 text-primary" />
-                        <span className="text-sm">2-year certification</span>
-                      </div>
-                    </div>
-
-                    {/* Next Class Information */}
-                    {courseInfo.Heartsaver.hasUpcoming && (
-                      <div className="mb-6 p-4 bg-muted/30 rounded-lg">
-                        <h4 className="font-semibold mb-2 flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-primary" />
-                          <span>Next Class</span>
-                        </h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Date:</span>
-                            <span data-testid="text-heartsaver-next-date">{courseInfo.Heartsaver.nextDate}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Time:</span>
-                            <span data-testid="text-heartsaver-next-time">{courseInfo.Heartsaver.nextTime}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Enrolled:</span>
-                            <span data-testid="text-heartsaver-enrollment">{courseInfo.Heartsaver.enrolled} students</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Available:</span>
-                            <span className={`font-medium ${courseInfo.Heartsaver.available <= 3 ? 'text-orange-600' : 'text-green-600'}`} data-testid="text-heartsaver-available">
-                              {courseInfo.Heartsaver.available} spots remaining
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {!courseInfo.Heartsaver.hasUpcoming && (
-                      <div className="mb-6 p-4 bg-muted/30 rounded-lg">
-                        <h4 className="font-semibold mb-2 flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span>No Upcoming Classes</span>
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          Contact us to request a new Heartsaver class or check back later for updated schedule.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="mb-6">
-                      <h4 className="font-semibold mb-3">Course Includes:</h4>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Adult hands-only CPR and CPR with breaths</span>
-                        </li>
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Child CPR with breaths</span>
-                        </li>
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Infant CPR with breaths</span>
-                        </li>
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Use of automated external defibrillator (AED)</span>
-                        </li>
-                        <li className="flex items-center space-x-2">
-                          <CheckCircle className="h-4 w-4 text-primary" />
-                          <span>Relief of choking in adults, children, and infants</span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <Button 
-                      onClick={() => handleRegister('Heartsaver')}
-                      size="lg"
-                      className="w-full"
-                      data-testid="button-register-heartsaver"
-                      disabled={isLoading || !courseInfo.Heartsaver.hasUpcoming || courseInfo.Heartsaver.available === 0}
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading Classes...
-                        </>
-                      ) : !courseInfo.Heartsaver.hasUpcoming ? (
-                        "No Heartsaver Classes Scheduled"
-                      ) : courseInfo.Heartsaver.available === 0 ? (
-                        "Heartsaver Classes Full - Contact for Waitlist"
-                      ) : (
-                        `Register for Heartsaver Course (${courseInfo.Heartsaver.available} spots available)`
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Class Summary Section */}
-            <div className="max-w-4xl mx-auto">
-              <Card className="p-8">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-center space-x-2">
-                    <Calendar className="h-6 w-6" />
-                    <span>Upcoming Classes Summary</span>
-                  </CardTitle>
-                  <CardDescription className="text-lg">
-                    See what courses are available and get started with your CPR certification today
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin" />
-                      <span className="ml-2">Loading class information...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="grid md:grid-cols-2 gap-6">
-                        {/* BLS Summary */}
-                        <div className="p-4 border rounded-lg">
-                          <div className="flex items-center space-x-2 mb-3">
-                            <Stethoscope className="h-5 w-5 text-primary" />
-                            <h3 className="font-semibold">BLS Provider</h3>
-                          </div>
-                          {courseInfo.BLS.hasUpcoming ? (
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Next class:</span>
-                                <span data-testid="text-bls-summary-date">{courseInfo.BLS.nextDate?.split(',')[1]?.trim()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Available spots:</span>
-                                <span className={courseInfo.BLS.available <= 3 ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'} data-testid="text-bls-summary-available">
-                                  {courseInfo.BLS.available} of {courseInfo.BLS.capacity}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Price:</span>
-                                <span data-testid="text-bls-summary-price">{courseInfo.BLS.price}</span>
-                              </div>
+                    return (
+                      <AccordionItem 
+                        key={classType.id} 
+                        value={classType.id}
+                        data-testid={`accordion-item-${classType.id}`}
+                      >
+                        <AccordionTrigger className="hover:no-underline">
+                          <div className="flex items-center justify-between w-full pr-4">
+                            <div className="flex items-center space-x-3">
+                              <h2 className="text-2xl font-bold">{classType.displayName}</h2>
+                              <Badge variant="secondary" data-testid={`badge-class-count-${classType.id}`}>
+                                {upcomingClasses.length} upcoming
+                              </Badge>
                             </div>
-                          ) : (
-                            <p className="text-sm text-muted-foreground" data-testid="text-bls-summary-none">
-                              No upcoming BLS classes scheduled
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Heartsaver Summary */}
-                        <div className="p-4 border rounded-lg">
-                          <div className="flex items-center space-x-2 mb-3">
-                            <Heart className="h-5 w-5 text-primary" />
-                            <h3 className="font-semibold">Heartsaver CPR AED</h3>
                           </div>
-                          {courseInfo.Heartsaver.hasUpcoming ? (
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Next class:</span>
-                                <span data-testid="text-heartsaver-summary-date">{courseInfo.Heartsaver.nextDate?.split(',')[1]?.trim()}</span>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="pt-6 space-y-6">
+                            {/* Class Type Description */}
+                            {classType.description && (
+                              <div className="bg-muted/30 rounded-lg p-4" data-testid={`description-${classType.id}`}>
+                                <p className="text-muted-foreground">{classType.description}</p>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Available spots:</span>
-                                <span className={courseInfo.Heartsaver.available <= 3 ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'} data-testid="text-heartsaver-summary-available">
-                                  {courseInfo.Heartsaver.available} of {courseInfo.Heartsaver.capacity}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Price:</span>
-                                <span data-testid="text-heartsaver-summary-price">{courseInfo.Heartsaver.price}</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-muted-foreground" data-testid="text-heartsaver-summary-none">
-                              No upcoming Heartsaver classes scheduled
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                            )}
 
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <Button 
-                          variant="outline" 
-                          size="lg" 
-                          data-testid="button-view-schedule"
-                          onClick={() => window.location.href = '/calendar'}
-                        >
+                            {/* Classes Grid */}
+                            {classes.length === 0 ? (
+                              <EmptyClassTypeState classType={classType} />
+                            ) : (
+                              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid={`classes-grid-${classType.id}`}>
+                                {classes
+                                  .sort((a: Class, b: Class) => parseLocalDate(a.date).getTime() - parseLocalDate(b.date).getTime())
+                                  .map((classData: Class) => (
+                                    <ClassCard 
+                                      key={classData.id} 
+                                      classData={classData} 
+                                      onRegister={handleRegister}
+                                    />
+                                  ))}
+                              </div>
+                            )}
+
+                            {/* Summary for this class type */}
+                            {classes.length > 0 && (
+                              <div className="mt-6 p-4 bg-muted/20 rounded-lg">
+                                <h4 className="font-semibold mb-2">Class Summary</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">Total Classes:</span>
+                                    <div className="font-medium" data-testid={`summary-total-${classType.id}`}>{classes.length}</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Upcoming:</span>
+                                    <div className="font-medium" data-testid={`summary-upcoming-${classType.id}`}>{upcomingClasses.length}</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Available Spots:</span>
+                                    <div className="font-medium" data-testid={`summary-available-${classType.id}`}>
+                                      {upcomingClasses.reduce((total: number, cls: Class) => total + cls.available, 0)}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Price Range:</span>
+                                    <div className="font-medium" data-testid={`summary-price-range-${classType.id}`}>
+                                      {classes.length > 0 ? (
+                                        (() => {
+                                          const prices = classes.map((cls: Class) => cls.price).filter((price: number) => price > 1);
+                                          if (prices.length === 0) return 'Contact for pricing';
+                                          const min = Math.min(...prices);
+                                          const max = Math.max(...prices);
+                                          return min === max ? `$${(min / 100).toFixed(2)}` : `$${(min / 100).toFixed(2)} - $${(max / 100).toFixed(2)}`;
+                                        })()
+                                      ) : 'N/A'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+              )}
+
+              {/* Call to Action Section */}
+              {groupedClasses.length > 0 && (
+                <div className="mt-12 text-center">
+                  <Card className="p-8">
+                    <CardContent>
+                      <h3 className="text-xl font-semibold mb-4">Ready to Get Certified?</h3>
+                      <p className="text-muted-foreground mb-6">
+                        Choose from our available courses above to start your CPR certification journey. 
+                        All courses are American Heart Association certified.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button size="lg" data-testid="button-view-calendar">
                           <Calendar className="mr-2 h-5 w-5" />
-                          View Full Schedule
+                          View Full Calendar
                         </Button>
                         <Button variant="outline" size="lg" data-testid="button-contact-instructor">
                           Contact Instructor
                         </Button>
                       </div>
-                      <p className="text-sm text-muted-foreground text-center">
-                        Total upcoming classes: <span data-testid="text-total-classes">{classes.length}</span> | 
-                        Questions? Contact us at (555) 123-4567 or info@lifesavercpr.com
-                      </p>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
 
       <Footer />
