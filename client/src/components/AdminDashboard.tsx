@@ -456,8 +456,13 @@ function AdminDashboardContent() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<InsertClient> }) => {
       return await apiRequest('PUT', `/api/clients/${id}`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+    onSuccess: async () => {
+      // Invalidate and refetch clients data to ensure fresh state
+      await queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/clients'] });
+      
+      // Clear form state completely
+      editClientForm.reset();
       setIsEditDialogOpen(false);
       setSelectedClient(null);
       toast({ title: "Success", description: "Client updated successfully" });
@@ -893,6 +898,11 @@ function AdminDashboardContent() {
     // to ensure we have the most up-to-date information
     const latestClient = clients.find(c => c.id === client.id) || client;
     setSelectedClient(latestClient);
+    
+    // Force a complete form reset to clear any stale state
+    editClientForm.reset();
+    
+    // Then set the fresh data
     editClientForm.reset({
       firstName: latestClient.firstName,
       lastName: latestClient.lastName,
@@ -900,7 +910,7 @@ function AdminDashboardContent() {
       phone: latestClient.phone || '',
       registrationDate: latestClient.registrationDate,
       lastCourseDate: latestClient.lastCourseDate || '',
-      completedCourses: latestClient.completedCourses
+      completedCourses: latestClient.completedCourses || []
     });
     setIsEditDialogOpen(true);
   };
