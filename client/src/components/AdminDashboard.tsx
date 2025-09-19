@@ -2745,7 +2745,7 @@ export default function AdminDashboard() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Class Type (Advanced)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
                         <FormControl>
                           <SelectTrigger data-testid="select-add-classtype">
                             <SelectValue placeholder="Select detailed class type" />
@@ -2778,7 +2778,8 @@ export default function AdminDashboard() {
                       <FormLabel>Description</FormLabel>
                       <FormControl>
                         <Textarea 
-                          {...field} 
+                          {...field}
+                          value={field.value || ''} 
                           placeholder="Enter a detailed description of the class content, requirements, and objectives..." 
                           className="min-h-[100px]"
                           data-testid="textarea-add-description"
@@ -2978,7 +2979,7 @@ export default function AdminDashboard() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Class Type (Advanced)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger data-testid="select-edit-classtype">
                               <SelectValue />
@@ -3011,7 +3012,8 @@ export default function AdminDashboard() {
                         <FormLabel>Description</FormLabel>
                         <FormControl>
                           <Textarea 
-                            {...field} 
+                            {...field}
+                            value={field.value || ''} 
                             placeholder="Enter a detailed description of the class content, requirements, and objectives..." 
                             className="min-h-[100px]"
                             data-testid="textarea-edit-description"
@@ -3621,7 +3623,8 @@ export default function AdminDashboard() {
                       <FormLabel>Description (Optional)</FormLabel>
                       <FormControl>
                         <Textarea 
-                          {...field} 
+                          {...field}
+                          value={field.value || ''} 
                           placeholder="Describe this class type and its purpose..." 
                           className="min-h-[80px]"
                           data-testid="textarea-add-classtype-description"
@@ -3731,7 +3734,8 @@ export default function AdminDashboard() {
                         <FormLabel>Description (Optional)</FormLabel>
                         <FormControl>
                           <Textarea 
-                            {...field} 
+                            {...field}
+                            value={field.value || ''} 
                             placeholder="Describe this class type and its purpose..." 
                             className="min-h-[80px]"
                             data-testid="textarea-edit-classtype-description"
