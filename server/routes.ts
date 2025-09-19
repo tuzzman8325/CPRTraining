@@ -492,7 +492,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/classes", requireAdmin, async (req, res) => {
     try {
       const classData = insertClassSchema.parse(req.body);
-      const newClass = await storage.createClass(classData);
+      
+      // Remove the old type field since we only use classTypeId now
+      const { type, ...filteredClassData } = classData;
+      
+      const newClass = await storage.createClass(filteredClassData);
       
       res.status(201).json({ 
         success: true, 
@@ -513,7 +517,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const updates = insertClassSchema.partial().parse(req.body);
       
-      const updatedClass = await storage.updateClass(id, updates);
+      // Remove the old type field since we only use classTypeId now
+      const { type, ...filteredUpdates } = updates;
+      
+      const updatedClass = await storage.updateClass(id, filteredUpdates);
       
       if (!updatedClass) {
         return res.status(404).json({ error: "Class not found" });

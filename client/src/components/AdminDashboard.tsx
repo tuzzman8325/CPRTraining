@@ -3109,41 +3109,10 @@ function AdminDashboardContent() {
                 
                 <FormField
                   control={addClassForm.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-add-type">
-                            <SelectValue placeholder="Select class type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {classTypesLoading ? (
-                            <SelectItem value="" disabled>Loading class types...</SelectItem>
-                          ) : classTypes.filter(ct => ct.isActive).length > 0 ? (
-                            classTypes.filter(ct => ct.isActive).map((classType) => (
-                              <SelectItem key={classType.id} value={classType.name}>
-                                {classType.displayName}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="" disabled>No active class types available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addClassForm.control}
                   name="classTypeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Class Type (Advanced)</FormLabel>
+                      <FormLabel>Class Type</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
                         <FormControl>
                           <SelectTrigger data-testid="select-add-classtype">
@@ -3343,41 +3312,10 @@ function AdminDashboardContent() {
                   
                   <FormField
                     control={editClassForm.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-edit-type">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {classTypesLoading ? (
-                              <SelectItem value="" disabled>Loading class types...</SelectItem>
-                            ) : classTypes.filter(ct => ct.isActive).length > 0 ? (
-                              classTypes.filter(ct => ct.isActive).map((classType) => (
-                                <SelectItem key={classType.id} value={classType.name}>
-                                  {classType.displayName}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem value="" disabled>No active class types available</SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={editClassForm.control}
                     name="classTypeId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Class Type (Advanced)</FormLabel>
+                        <FormLabel>Class Type</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger data-testid="select-edit-classtype">
