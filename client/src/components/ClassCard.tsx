@@ -45,10 +45,10 @@ export default function ClassCard({
       <CardHeader className="space-y-2">
         <div className="flex items-center justify-between">
           <Badge 
-            variant={classType.name === 'BLS' ? 'default' : 'secondary'} 
+            variant={classType.badgeColor as "default" | "secondary" | "destructive" | "outline"} 
             data-testid={`badge-${classType.name.toLowerCase()}`}
           >
-            {classType.name} Course
+            {classType.badgeLabel}
           </Badge>
           {hasUpcomingClass && (
             <span className="text-lg font-bold text-primary">${nextClass.price}</span>
