@@ -1062,6 +1062,6 @@ export class DbStorage implements IStorage {
   }
 }
 
-// Use MemStorage by default as per development guidelines
-// Only use DbStorage if explicitly configured for database usage
-export const storage = process.env.USE_DATABASE === 'true' ? new DbStorage() : new MemStorage();
+// Use DbStorage for admin functionality since we have existing data in PostgreSQL
+// This ensures admin users from the database are recognized
+export const storage = new DbStorage();

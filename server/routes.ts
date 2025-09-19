@@ -120,6 +120,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bootstrap admin endpoint - allows promoting user to admin when no admin exists
+  app.post('/api/bootstrap-admin', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
+      
+      if (!currentUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get all users to check admin status
+      const allUsers = await storage.getAllUsers();
+      const adminUsers = allUsers.filter(user => user.role === "admin");
+      
+      // If there are already admin users, only allow the first user (by creation date) to promote themselves
+      if (adminUsers.length > 0) {
+        const firstUser = allUsers.sort((a, b) => 
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )[0];
+        
+        if (currentUserId !== firstUser.id) {
+          return res.status(403).json({ 
+            error: "Admin users already exist. Only the first registered user can use this endpoint.",
+            hasAdmins: true,
+            adminCount: adminUsers.length
+          });
+        }
+      }
+
+      // If no admin users exist OR current user is the first user, promote them
+      const updatedUser = await storage.updateUserRole(currentUserId, "admin");
+      
+      if (!updatedUser) {
+        return res.status(500).json({ error: "Failed to update user role" });
+      }
+
+      res.json({ 
+        success: true, 
+        user: updatedUser,
+        message: "Successfully promoted to admin",
+        wasBootstrap: adminUsers.length === 0
+      });
+    } catch (error) {
+      console.error("Bootstrap admin error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Check admin status endpoint - publicly accessible to determine if admin setup is needed
+  app.get('/api/admin-status', async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const adminUsers = allUsers.filter(user => user.role === "admin");
+      const firstUser = allUsers.sort((a, b) => 
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      )[0];
+      
+      res.json({
+        success: true,
+        hasAdmins: adminUsers.length > 0,
+        adminCount: adminUsers.length,
+        totalUsers: allUsers.length,
+        firstUserId: firstUser?.id || null,
+        canBootstrap: adminUsers.length === 0 || (firstUser && adminUsers.length > 0)
+      });
+    } catch (error) {
+      console.error("Admin status check error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Admin-only routes middleware
   const requireAdmin = async (req: any, res: any, next: any) => {
     try {
