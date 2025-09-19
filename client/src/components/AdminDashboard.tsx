@@ -895,6 +895,36 @@ function AdminDashboardContent() {
     (classType.description && classType.description.toLowerCase().includes(classTypeSearchTerm.toLowerCase()))
   );
 
+  // Normalize completed courses to only use classType.id values (same logic as badge display)
+  const normalizeCompletedCourses = (completedCourses: string[]) => {
+    const seenClassTypeIds = new Set<string>();
+    const normalizedCourses: string[] = [];
+    
+    completedCourses.forEach((entry) => {
+      // Try to find the classType for this entry using the same logic as badge display
+      let classType = classTypes.find(ct => ct.id === entry); // Try classType.id first (preferred)
+      if (!classType) {
+        // Legacy support: try class.id -> classType.id
+        const classItem = classes.find(c => c.id === entry);
+        if (classItem) {
+          classType = classTypes.find(ct => ct.id === classItem.classTypeId);
+        }
+      }
+      if (!classType) {
+        // Legacy support: try course type names or badgeLabels
+        classType = classTypes.find(ct => ct.badgeLabel === entry || ct.name === entry);
+      }
+      
+      // Only add if we found a valid classType and haven't seen it before
+      if (classType && !seenClassTypeIds.has(classType.id)) {
+        seenClassTypeIds.add(classType.id);
+        normalizedCourses.push(classType.id);
+      }
+    });
+    
+    return normalizedCourses;
+  };
+
   // Client handlers
   const handleEdit = (client: Client) => {
     // Always find the latest client data from the current clients list
@@ -905,6 +935,11 @@ function AdminDashboardContent() {
     // Force a complete form reset to clear any stale state
     editClientForm.reset();
     
+    // Only normalize if we have the required data loaded, otherwise use raw data
+    const completedCoursesData = (classTypes.length > 0 && classes.length > 0) 
+      ? normalizeCompletedCourses(latestClient.completedCourses || [])
+      : latestClient.completedCourses || [];
+    
     // Then set the fresh data
     editClientForm.reset({
       firstName: latestClient.firstName,
@@ -913,7 +948,7 @@ function AdminDashboardContent() {
       phone: latestClient.phone || '',
       registrationDate: latestClient.registrationDate,
       lastCourseDate: latestClient.lastCourseDate || '',
-      completedCourses: latestClient.completedCourses || []
+      completedCourses: completedCoursesData
     });
     setIsEditDialogOpen(true);
   };
@@ -3006,7 +3041,7 @@ function AdminDashboardContent() {
 
         {/* Edit Client Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Client</DialogTitle>
               <DialogDescription>
