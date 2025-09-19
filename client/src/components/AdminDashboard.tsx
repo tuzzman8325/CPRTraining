@@ -1132,7 +1132,22 @@ function AdminDashboardContent() {
     availableSpots: classes.reduce((sum, classItem) => sum + classItem.available, 0),
     totalRegistrations: registrations.length,
     pendingRegistrations: registrations.filter(r => r.status === 'pending').length,
-    monthlyRevenue: 2450 // TODO: Calculate from actual data
+    monthlyRevenue: (() => {
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth();
+      const currentYear = currentDate.getFullYear();
+      
+      return registrations
+        .filter(r => {
+          // Only include confirmed registrations
+          if (r.status !== 'confirmed') return false;
+          
+          // Only include registrations from current month/year
+          const regDate = new Date(r.registrationDate);
+          return regDate.getMonth() === currentMonth && regDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, r) => sum + (r.amountPaid || 0), 0) / 100; // Convert cents to dollars
+    })()
   };
 
   // Toggle collapsible sections
