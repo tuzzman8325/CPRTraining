@@ -101,8 +101,12 @@ export const clients = pgTable("clients", {
 export const emailSettings = pgTable("email_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   senderEmail: text("sender_email").notNull().default("noreply@example.com"),
-  businessName: text("business_name").notNull().default("Professional Training Services"),
-  emailSignature: text("email_signature").default("Thank you for choosing our training services!"),
+  replyToEmail: text("reply_to_email"), // Reply-to email address (optional, defaults to senderEmail)
+  businessName: text("business_name").notNull().default("CPR Training Center"),
+  businessPhone: text("business_phone"), // Business phone number
+  businessAddress: text("business_address"), // Business address/location
+  emailSignature: text("email_signature").default("Thank you for choosing our professional CPR training services!"),
+  confirmationEmailTemplate: text("confirmation_email_template"), // Custom email template (optional, uses default if null)
   enableEmailConfirmations: boolean("enable_email_confirmations").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`NOW()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`NOW()`),

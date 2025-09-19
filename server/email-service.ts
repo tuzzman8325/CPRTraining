@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import type { Class, Registration, DiscountCode } from '@shared/schema';
+import type { Class, Registration, DiscountCode, EmailSettings } from '@shared/schema';
 
 // Email configuration interface
 export interface EmailConfig {
@@ -13,6 +13,7 @@ export interface RegistrationEmailData {
   classData: Class;
   discountCode?: DiscountCode | null;
   paymentAmount?: number; // Amount in dollars (converted from cents)
+  emailSettings?: EmailSettings; // Optional email settings for dynamic configuration
 }
 
 // Email service class
@@ -29,6 +30,22 @@ export class EmailService {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  // Email address validation to prevent header injection
+  private validateEmailAddress(email: string): boolean {
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return false;
+    
+    // Check for header injection attempts
+    const dangerousChars = /[\r\n\0]/;
+    if (dangerousChars.test(email)) return false;
+    
+    // Additional security checks
+    if (email.length > 254) return false; // RFC 5321 limit
+    
+    return true;
   }
 
   constructor() {
@@ -114,12 +131,18 @@ export class EmailService {
 
   // Generate registration confirmation email HTML
   private generateRegistrationConfirmationHTML(data: RegistrationEmailData): string {
-    const { registration, classData, discountCode, paymentAmount } = data;
+    const { registration, classData, discountCode, paymentAmount, emailSettings } = data;
+    
+    // Use configurable settings with fallbacks
+    const businessName = emailSettings?.businessName || 'CPR Training Center';
+    const businessPhone = emailSettings?.businessPhone;
+    const businessAddress = emailSettings?.businessAddress;
+    const emailSignature = emailSettings?.emailSignature || 'Thank you for choosing our professional CPR training services!';
     
     const formattedDate = this.formatDate(classData.date);
     const formattedTime = this.formatTime(classData.time);
     const originalPrice = this.formatCurrency(classData.price);
-    const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount * 100) : 'Pending';
+    const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount) : 'Pending';
     
     return `
 <!DOCTYPE html>
@@ -279,7 +302,7 @@ export class EmailService {
         <div class="header">
             <div class="logo">
                 <span class="ecg-line">⎯⎯⎯╱╲⎯╱╲⎯⎯⎯</span>
-                CPR Training Pro
+                ${this.escapeHtml(businessName)}
             </div>
             <p class="subtitle">Professional CPR & First Aid Certification</p>
         </div>
@@ -371,16 +394,17 @@ export class EmailService {
             
             <p>We look forward to seeing you in class!</p>
             
-            <p><strong>CPR Training Pro Team</strong></p>
+            <p><strong>${this.escapeHtml(businessName)} Team</strong></p>
         </div>
         
         <div class="footer">
             <div class="contact-info">
                 <p><strong>Contact Information</strong></p>
-                <p>Email: info@cprtrainingpro.com</p>
-                <p>Phone: (555) 123-4567</p>
-                <p>Website: www.cprtrainingpro.com</p>
+                ${businessPhone ? `<p>Phone: ${this.escapeHtml(businessPhone)}</p>` : ''}
+                ${businessAddress ? `<p>Address: ${this.escapeHtml(businessAddress)}</p>` : ''}
+                ${emailSettings?.replyToEmail ? `<p>Email: ${this.escapeHtml(emailSettings.replyToEmail)}</p>` : ''}
             </div>
+            ${emailSignature ? `<p style="font-style: italic; margin-top: 15px;">${this.escapeHtml(emailSignature)}</p>` : ''}
             <p style="font-size: 12px; color: #9ca3af; margin: 0;">
                 This is an automated confirmation email. Please save this email for your records.
             </p>
@@ -393,15 +417,21 @@ export class EmailService {
 
   // Generate plain text version of registration confirmation
   private generateRegistrationConfirmationText(data: RegistrationEmailData): string {
-    const { registration, classData, discountCode, paymentAmount } = data;
+    const { registration, classData, discountCode, paymentAmount, emailSettings } = data;
+    
+    // Use configurable settings with fallbacks
+    const businessName = emailSettings?.businessName || 'CPR Training Center';
+    const businessPhone = emailSettings?.businessPhone;
+    const businessAddress = emailSettings?.businessAddress;
+    const emailSignature = emailSettings?.emailSignature || 'Thank you for choosing our professional CPR training services!';
     
     const formattedDate = this.formatDate(classData.date);
     const formattedTime = this.formatTime(classData.time);
     const originalPrice = this.formatCurrency(classData.price);
-    const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount * 100) : 'Pending';
+    const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount) : 'Pending';
 
     return `
-CPR TRAINING PRO - REGISTRATION CONFIRMATION
+${businessName.toUpperCase()} - REGISTRATION CONFIRMATION
 
 Hello ${this.escapeHtml(registration.firstName)} ${this.escapeHtml(registration.lastName)},
 
@@ -447,6 +477,92 @@ This is an automated confirmation email. Please save this email for your records
     `;
   }
 
+  // Generate custom template HTML by replacing placeholders
+  private generateCustomTemplateHTML(data: RegistrationEmailData, template: string): string {
+    const { registration, classData, discountCode, paymentAmount, emailSettings } = data;
+    
+    // Create replacement object with all available data
+    const replacements: Record<string, string> = {
+      'STUDENT_FIRST_NAME': this.escapeHtml(registration.firstName),
+      'STUDENT_LAST_NAME': this.escapeHtml(registration.lastName),
+      'STUDENT_EMAIL': this.escapeHtml(registration.email),
+      'STUDENT_PHONE': this.escapeHtml(registration.phone || ''),
+      'CLASS_TITLE': this.escapeHtml(classData.title),
+      'CLASS_TYPE': classData.type === 'BLS' ? 'Basic Life Support (BLS)' : 'Heartsaver CPR/AED',
+      'CLASS_DATE': this.formatDate(classData.date),
+      'CLASS_TIME': this.formatTime(classData.time),
+      'CLASS_DURATION': this.escapeHtml(classData.duration),
+      'CLASS_ORIGINAL_PRICE': this.formatCurrency(classData.price),
+      'PAYMENT_AMOUNT': paymentAmount !== undefined ? this.formatCurrency(paymentAmount) : 'Pending',
+      'PAYMENT_STATUS': registration.status === 'confirmed' ? 'Confirmed' : 'Pending',
+      'PAYMENT_ID': this.escapeHtml(registration.paymentIntentId || ''),
+      'REGISTRATION_ID': this.escapeHtml(registration.id),
+      'DISCOUNT_CODE': discountCode ? this.escapeHtml(discountCode.code) : '',
+      'DISCOUNT_DESCRIPTION': discountCode ? this.escapeHtml(discountCode.description || '') : '',
+      'BUSINESS_NAME': this.escapeHtml(emailSettings?.businessName || 'CPR Training Center'),
+      'BUSINESS_PHONE': this.escapeHtml(emailSettings?.businessPhone || ''),
+      'BUSINESS_ADDRESS': this.escapeHtml(emailSettings?.businessAddress || ''),
+      'EMAIL_SIGNATURE': this.escapeHtml(emailSettings?.emailSignature || 'Thank you for choosing our professional CPR training services!')
+    };
+    
+    // Replace all placeholders in the template
+    let result = template;
+    for (const [placeholder, value] of Object.entries(replacements)) {
+      const regex = new RegExp(`{{${placeholder}}}`, 'g');
+      result = result.replace(regex, value);
+    }
+    
+    return result;
+  }
+
+  // Generate custom template text by replacing placeholders
+  private generateCustomTemplateText(data: RegistrationEmailData, template: string): string {
+    // Convert HTML template to plain text and then process placeholders
+    const textTemplate = template
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/&nbsp;/g, ' ') // Replace HTML entities
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'");
+    
+    const { registration, classData, discountCode, paymentAmount, emailSettings } = data;
+    
+    // Create replacement object with all available data (no HTML escaping for text)
+    const replacements: Record<string, string> = {
+      'STUDENT_FIRST_NAME': registration.firstName,
+      'STUDENT_LAST_NAME': registration.lastName,
+      'STUDENT_EMAIL': registration.email,
+      'STUDENT_PHONE': registration.phone || '',
+      'CLASS_TITLE': classData.title,
+      'CLASS_TYPE': classData.type === 'BLS' ? 'Basic Life Support (BLS)' : 'Heartsaver CPR/AED',
+      'CLASS_DATE': this.formatDate(classData.date),
+      'CLASS_TIME': this.formatTime(classData.time),
+      'CLASS_DURATION': classData.duration,
+      'CLASS_ORIGINAL_PRICE': this.formatCurrency(classData.price),
+      'PAYMENT_AMOUNT': paymentAmount !== undefined ? this.formatCurrency(paymentAmount) : 'Pending',
+      'PAYMENT_STATUS': registration.status === 'confirmed' ? 'Confirmed' : 'Pending',
+      'PAYMENT_ID': registration.paymentIntentId || '',
+      'REGISTRATION_ID': registration.id,
+      'DISCOUNT_CODE': discountCode ? discountCode.code : '',
+      'DISCOUNT_DESCRIPTION': discountCode ? (discountCode.description || '') : '',
+      'BUSINESS_NAME': emailSettings?.businessName || 'CPR Training Center',
+      'BUSINESS_PHONE': emailSettings?.businessPhone || '',
+      'BUSINESS_ADDRESS': emailSettings?.businessAddress || '',
+      'EMAIL_SIGNATURE': emailSettings?.emailSignature || 'Thank you for choosing our professional CPR training services!'
+    };
+    
+    // Replace all placeholders in the template
+    let result = textTemplate;
+    for (const [placeholder, value] of Object.entries(replacements)) {
+      const regex = new RegExp(`{{${placeholder}}}`, 'g');
+      result = result.replace(regex, value);
+    }
+    
+    return result;
+  }
+
   // Send registration confirmation email
   public async sendRegistrationConfirmation(data: RegistrationEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.isConfigured) {
@@ -455,16 +571,39 @@ This is an automated confirmation email. Please save this email for your records
     }
 
     try {
-      const { registration, classData } = data;
+      const { registration, classData, emailSettings } = data;
+      
+      // Validate recipient email address
+      if (!this.validateEmailAddress(registration.email)) {
+        console.error('[EMAIL_SECURITY] Invalid or potentially malicious email address:', registration.email);
+        return { success: false, error: 'Invalid email address' };
+      }
+      
+      // Use configurable settings with fallbacks
+      const businessName = emailSettings?.businessName || 'CPR Training Center';
+      const senderEmail = emailSettings?.senderEmail || process.env.GMAIL_USER!;
+      const replyToEmail = emailSettings?.replyToEmail || senderEmail;
       
       const subject = `Registration Confirmed - ${classData.title} on ${this.formatDate(classData.date)}`;
-      const htmlContent = this.generateRegistrationConfirmationHTML(data);
-      const textContent = this.generateRegistrationConfirmationText(data);
+      
+      // Use custom template if provided, otherwise use default
+      let htmlContent: string;
+      let textContent: string;
+      
+      if (emailSettings?.confirmationEmailTemplate) {
+        // Parse custom template and replace placeholders
+        htmlContent = this.generateCustomTemplateHTML(data, emailSettings.confirmationEmailTemplate);
+        textContent = this.generateCustomTemplateText(data, emailSettings.confirmationEmailTemplate);
+      } else {
+        // Use default templates
+        htmlContent = this.generateRegistrationConfirmationHTML(data);
+        textContent = this.generateRegistrationConfirmationText(data);
+      }
 
-      const mailOptions = {
+      const mailOptions: any = {
         from: {
-          name: 'CPR Training Pro',
-          address: process.env.GMAIL_USER!
+          name: businessName,
+          address: senderEmail
         },
         to: registration.email,
         subject: subject,
@@ -472,11 +611,16 @@ This is an automated confirmation email. Please save this email for your records
         html: htmlContent,
         // Add headers for better email client handling
         headers: {
-          'X-Mailer': 'CPR Training Pro Registration System',
+          'X-Mailer': `${businessName} Registration System`,
           'X-Priority': '1',
           'Importance': 'high'
         }
       };
+
+      // Add reply-to if different from sender
+      if (replyToEmail && replyToEmail !== senderEmail) {
+        mailOptions.replyTo = replyToEmail;
+      }
 
       console.log(`[EMAIL_SEND] Sending registration confirmation email to ${registration.email} for class: ${classData.title}`);
       

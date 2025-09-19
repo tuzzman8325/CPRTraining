@@ -55,7 +55,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Class, InsertClass, insertClassSchema, ClassType, InsertClassType, insertClassTypeSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema, Client, InsertClient, insertClientSchema, User } from '@shared/schema';
+import { Class, InsertClass, insertClassSchema, ClassType, InsertClassType, insertClassTypeSchema, Registration, DiscountCode, InsertDiscountCode, insertDiscountCodeSchema, Client, InsertClient, insertClientSchema, User, EmailSettings, InsertEmailSettings } from '@shared/schema';
 import { ImageSelector } from '@/components/ui/image-selector';
 import { Textarea } from '@/components/ui/textarea';
 import { z } from 'zod';
@@ -129,6 +129,22 @@ interface ClassTypeResponse {
   message: string;
 }
 
+interface EmailSettingsResponse {
+  success: boolean;
+  emailSettings: EmailSettings;
+}
+
+interface EmailSettingsUpdateResponse {
+  success: boolean;
+  emailSettings: EmailSettings;
+  message: string;
+}
+
+interface EmailTestResponse {
+  success: boolean;
+  message: string;
+}
+
 import { 
   Search, 
   Plus, 
@@ -152,7 +168,9 @@ import {
   ChevronRight as ChevronRightIcon,
   Shield,
   UserMinus,
-  BarChart3
+  BarChart3,
+  Mail,
+  Send
 } from 'lucide-react';
 import {
   Tooltip,
@@ -231,6 +249,10 @@ function AdminDashboardContent() {
   const [isAddClassTypeDialogOpen, setIsAddClassTypeDialogOpen] = useState(false);
   const [isEditClassTypeDialogOpen, setIsEditClassTypeDialogOpen] = useState(false);
 
+  // Email Configuration state
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [isTestEmailLoading, setIsTestEmailLoading] = useState(false);
+
   // Roster state
   const [isGeneratingRoster, setIsGeneratingRoster] = useState(false);
   
@@ -266,12 +288,30 @@ function AdminDashboardContent() {
   const { data: classTypesData, isLoading: classTypesLoading } = useQuery<ClassTypesResponse>({
     queryKey: ['/api/class-types'],
   });
+
+  // React Query hooks for email settings
+  const { data: emailSettingsData, isLoading: emailSettingsLoading, refetch: refetchEmailSettings } = useQuery<EmailSettingsResponse>({
+    queryKey: ['/api/email-settings'],
+  });
   
   const clients: Client[] = clientsData?.clients || [];
   const classes: Class[] = classesData?.classes || [];
   const discountCodes: DiscountCode[] = discountCodesData?.discountCodes || [];
   const users: User[] = usersData?.users || [];
   const classTypes: ClassType[] = classTypesData?.classTypes || [];
+  const emailSettings: EmailSettings = emailSettingsData?.emailSettings || {
+    id: 'default',
+    senderEmail: 'noreply@example.com',
+    replyToEmail: null,
+    businessName: 'CPR Training Center',
+    businessPhone: null,
+    businessAddress: null,
+    emailSignature: 'Thank you for choosing our professional CPR training services!',
+    confirmationEmailTemplate: null,
+    enableEmailConfirmations: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
   
   const createClassMutation = useMutation({
     mutationFn: async (data: InsertClass) => {
@@ -568,6 +608,36 @@ function AdminDashboardContent() {
         description: errorMessage, 
         variant: "destructive" 
       });
+    }
+  });
+
+  // Email Settings mutations
+  const updateEmailSettingsMutation = useMutation({
+    mutationFn: async (data: Partial<InsertEmailSettings>) => {
+      return await apiRequest('PUT', '/api/email-settings', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/email-settings'] });
+      refetchEmailSettings();
+      toast({ title: "Success", description: "Email settings updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error", description: `Failed to update email settings: ${error.message}`, variant: "destructive" });
+    }
+  });
+
+  const sendTestEmailMutation = useMutation({
+    mutationFn: async (data: { testRecipient: string }) => {
+      return await apiRequest('POST', '/api/send-test-email', data);
+    },
+    onSuccess: () => {
+      setTestEmailRecipient('');
+      setIsTestEmailLoading(false);
+      toast({ title: "Success", description: "Test email sent successfully!" });
+    },
+    onError: (error) => {
+      setIsTestEmailLoading(false);
+      toast({ title: "Error", description: `Failed to send test email: ${error.message}`, variant: "destructive" });
     }
   });
   
@@ -2354,6 +2424,225 @@ function AdminDashboardContent() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        {/* Email Configuration */}
+        <Collapsible open={openSection === 'email-settings'} onOpenChange={() => toggleSection('email-settings')}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" data-testid="section-header-email-settings">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Mail className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <CardTitle className="text-lg">Email Configuration</CardTitle>
+                      <CardDescription>
+                        Manage email settings and test email delivery
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <Badge variant={emailSettings.enableEmailConfirmations ? "default" : "secondary"} className="hidden sm:inline-flex">
+                      {emailSettings.enableEmailConfirmations ? "Enabled" : "Disabled"}
+                    </Badge>
+                    {openSection === 'email-settings' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0 space-y-6">
+                {emailSettingsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="text-center">
+                      <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                      <p className="text-sm text-muted-foreground">Loading email settings...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Email Settings Form */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="senderEmail" data-testid="label-sender-email">Sender Email Address</Label>
+                          <Input
+                            id="senderEmail"
+                            type="email"
+                            placeholder="noreply@example.com"
+                            value={emailSettings.senderEmail}
+                            onChange={(e) => {
+                              updateEmailSettingsMutation.mutate({
+                                senderEmail: e.target.value
+                              });
+                            }}
+                            data-testid="input-sender-email"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="replyToEmail" data-testid="label-reply-to-email">Reply-to Email Address (Optional)</Label>
+                          <Input
+                            id="replyToEmail"
+                            type="email"
+                            placeholder="support@example.com"
+                            value={emailSettings.replyToEmail || ''}
+                            onChange={(e) => {
+                              updateEmailSettingsMutation.mutate({
+                                replyToEmail: e.target.value || null
+                              });
+                            }}
+                            data-testid="input-reply-to-email"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="businessName" data-testid="label-business-name">Business/Sender Name</Label>
+                          <Input
+                            id="businessName"
+                            placeholder="CPR Training Center"
+                            value={emailSettings.businessName}
+                            onChange={(e) => {
+                              updateEmailSettingsMutation.mutate({
+                                businessName: e.target.value
+                              });
+                            }}
+                            data-testid="input-business-name"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="businessPhone" data-testid="label-business-phone">Business Phone Number (Optional)</Label>
+                          <Input
+                            id="businessPhone"
+                            placeholder="(555) 123-4567"
+                            value={emailSettings.businessPhone || ''}
+                            onChange={(e) => {
+                              updateEmailSettingsMutation.mutate({
+                                businessPhone: e.target.value || null
+                              });
+                            }}
+                            data-testid="input-business-phone"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="businessAddress" data-testid="label-business-address">Business Address/Location (Optional)</Label>
+                          <Textarea
+                            id="businessAddress"
+                            placeholder="123 Main Street&#10;City, State 12345"
+                            value={emailSettings.businessAddress || ''}
+                            onChange={(e) => {
+                              updateEmailSettingsMutation.mutate({
+                                businessAddress: e.target.value || null
+                              });
+                            }}
+                            rows={3}
+                            data-testid="textarea-business-address"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="emailSignature" data-testid="label-email-signature">Email Signature</Label>
+                          <Textarea
+                            id="emailSignature"
+                            placeholder="Thank you for choosing our professional CPR training services!"
+                            value={emailSettings.emailSignature || ''}
+                            onChange={(e) => {
+                              updateEmailSettingsMutation.mutate({
+                                emailSignature: e.target.value
+                              });
+                            }}
+                            rows={3}
+                            data-testid="textarea-email-signature"
+                          />
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="enableEmailConfirmations"
+                            checked={emailSettings.enableEmailConfirmations}
+                            onCheckedChange={(checked) => {
+                              updateEmailSettingsMutation.mutate({
+                                enableEmailConfirmations: checked
+                              });
+                            }}
+                            data-testid="switch-enable-email-confirmations"
+                          />
+                          <Label htmlFor="enableEmailConfirmations" data-testid="label-enable-email-confirmations">
+                            Enable Email Confirmations
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Email Template Customization */}
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-medium mb-4">Email Template Customization</h3>
+                      <div>
+                        <Label htmlFor="confirmationEmailTemplate" data-testid="label-confirmation-template">
+                          Custom Confirmation Email Template (Optional)
+                        </Label>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Leave empty to use the default template. You can use placeholders like {'{'}firstName{'}'}, {'{'}className{'}'}, {'{'}date{'}'}, {'{'}time{'}'}
+                        </p>
+                        <Textarea
+                          id="confirmationEmailTemplate"
+                          placeholder="Custom email template with placeholders..."
+                          value={emailSettings.confirmationEmailTemplate || ''}
+                          onChange={(e) => {
+                            updateEmailSettingsMutation.mutate({
+                              confirmationEmailTemplate: e.target.value || null
+                            });
+                          }}
+                          rows={6}
+                          data-testid="textarea-confirmation-template"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Email Testing */}
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-medium mb-4">Email Testing</h3>
+                      <div className="flex items-end space-x-4">
+                        <div className="flex-1">
+                          <Label htmlFor="testEmailRecipient" data-testid="label-test-recipient">Test Email Recipient</Label>
+                          <Input
+                            id="testEmailRecipient"
+                            type="email"
+                            placeholder="admin@example.com"
+                            value={testEmailRecipient}
+                            onChange={(e) => setTestEmailRecipient(e.target.value)}
+                            data-testid="input-test-recipient"
+                          />
+                        </div>
+                        <Button 
+                          onClick={() => {
+                            if (testEmailRecipient) {
+                              setIsTestEmailLoading(true);
+                              sendTestEmailMutation.mutate({ testRecipient: testEmailRecipient });
+                            }
+                          }}
+                          disabled={!testEmailRecipient || isTestEmailLoading || sendTestEmailMutation.isPending}
+                          data-testid="button-send-test-email"
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          {isTestEmailLoading || sendTestEmailMutation.isPending ? 'Sending...' : 'Send Test Email'}
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Send a sample registration confirmation email to test your configuration
+                      </p>
+                    </div>
                   </div>
                 )}
               </CardContent>

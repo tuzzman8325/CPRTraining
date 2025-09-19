@@ -645,24 +645,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate payment amount (convert from cents to dollars for email display)
         const paymentAmount = registrationData.amountPaid ? registrationData.amountPaid / 100 : undefined;
         
-        // Send confirmation email in fire-and-forget pattern (non-blocking)
-        console.log(`[EMAIL_QUEUE] Queuing confirmation email for ${registration.email} (Registration: ${registration.id})`);
-        emailService.sendRegistrationConfirmation({
-          registration,
-          classData,
-          discountCode,
-          paymentAmount
-        }).then((result) => {
+        // Load email settings for dynamic configuration
+        const emailSettings = await storage.getEmailSettings().catch((error) => {
+          console.warn('[EMAIL_SETTINGS] Failed to load email settings, using defaults:', error);
+          return null;
+        });
+        
+        // Check if email confirmations are enabled before sending
+        if (emailSettings && emailSettings.enableEmailConfirmations) {
+          // Send confirmation email in fire-and-forget pattern (non-blocking)
+          console.log(`[EMAIL_QUEUE] Queuing confirmation email for ${registration.email} (Registration: ${registration.id})`);
+          emailService.sendRegistrationConfirmation({
+            registration,
+            classData,
+            discountCode,
+            paymentAmount,
+            emailSettings
+          }).then((result) => {
           if (result.success) {
             console.log(`[EMAIL_SUCCESS] Confirmation email sent to ${registration.email} (Registration: ${registration.id}, Message ID: ${result.messageId})`);
           } else {
             console.error(`[EMAIL_ERROR] Failed to send confirmation email to ${registration.email} (Registration: ${registration.id}): ${result.error}`);
           }
-        }).catch((emailError) => {
-          console.error(`[EMAIL_ERROR] Email service error for ${registration.email} (Registration: ${registration.id}):`, emailError);
-        });
-        
-        console.log(`[EMAIL_QUEUE] Email queued for background processing`);
+          }).catch((emailError) => {
+            console.error(`[EMAIL_ERROR] Email service error for ${registration.email} (Registration: ${registration.id}):`, emailError);
+          });
+          
+          console.log(`[EMAIL_QUEUE] Email queued for background processing`);
+        } else {
+          console.log(`[EMAIL_SKIP] Email confirmations disabled - skipping email for ${registration.email} (Registration: ${registration.id})`);
+        }
       } catch (emailError) {
         // Log email error but don't break the registration process
         console.error(`[EMAIL_ERROR] Failed to queue confirmation email to ${registration.email}:`, emailError);
@@ -1048,6 +1060,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Create payment intent error:", error);
       res.status(500).json({ 
         error: "Error creating payment intent", 
+        message: error.message 
+      });
+    }
+  });
+
+  // Email Settings endpoints
+  app.get("/api/email-settings", requireAdmin, async (req, res) => {
+    try {
+      const emailSettings = await storage.getEmailSettings();
+      res.json({ 
+        success: true, 
+        emailSettings 
+      });
+    } catch (error) {
+      console.error("Get email settings error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/email-settings", requireAdmin, async (req, res) => {
+    try {
+      // Validate the request body using zod schema
+      const updates = insertEmailSettingsSchema.partial().parse(req.body);
+      
+      const updatedSettings = await storage.updateEmailSettings(updates);
+      
+      res.json({ 
+        success: true, 
+        emailSettings: updatedSettings,
+        message: "Email settings updated successfully"
+      });
+    } catch (error) {
+      console.error("Update email settings error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid email settings data", details: (error as any).errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Email Settings test endpoint
+  app.post("/api/email-settings/test", requireAdmin, async (req, res) => {
+    try {
+      const { testRecipient } = req.body;
+      
+      if (!testRecipient) {
+        return res.status(400).json({ error: "Test recipient email is required" });
+      }
+      
+      // Validate email format using the EmailService validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const dangerousChars = /[\r\n\0]/;
+      
+      if (!emailRegex.test(testRecipient) || dangerousChars.test(testRecipient) || testRecipient.length > 254) {
+        return res.status(400).json({ error: "Invalid or unsafe email format" });
+      }
+      
+      // Get current email settings
+      const emailSettings = await storage.getEmailSettings();
+      
+      // Create a mock registration data for testing
+      const mockRegistrationData = {
+        registration: {
+          id: "test-registration-" + Date.now(),
+          firstName: "Test",
+          lastName: "User",
+          email: testRecipient,
+          phone: "(555) 123-4567",
+          classId: "test-class",
+          userId: null,
+          discountCodeId: null,
+          paymentIntentId: "pi_test_" + Date.now(),
+          amountPaid: 8500, // $85.00 in cents
+          status: "confirmed" as const,
+          registrationDate: new Date().toISOString().split('T')[0],
+        },
+        classData: {
+          id: "test-class",
+          title: "Test CPR Training Class",
+          type: "BLS" as const,
+          classTypeId: "test-type",
+          description: "This is a test email for your CPR training system configuration.",
+          image: null,
+          date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+          time: "10:00 AM",
+          duration: "4 hours",
+          capacity: 12,
+          available: 8,
+          price: 8500 // $85.00 in cents
+        },
+        paymentAmount: 85.00, // Amount in dollars (converted from cents in registration route)
+        emailSettings
+      };
+      
+      // Send the test email
+      const emailResult = await emailService.sendRegistrationConfirmation(mockRegistrationData);
+      
+      if (emailResult.success) {
+        res.json({ 
+          success: true,
+          message: `Test email sent successfully to ${testRecipient}`,
+          messageId: emailResult.messageId
+        });
+      } else {
+        res.status(500).json({ 
+          success: false,
+          error: emailResult.error || "Failed to send test email. Please check your email configuration."
+        });
+      }
+    } catch (error: any) {
+      console.error("Send test email error:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to send test email", 
+        message: error.message 
+      });
+    }
+  });
+
+  // Legacy email testing endpoint (keeping for backward compatibility)
+  app.post("/api/send-test-email", requireAdmin, async (req, res) => {
+    try {
+      const { testRecipient } = req.body;
+      
+      if (!testRecipient) {
+        return res.status(400).json({ error: "Test recipient email is required" });
+      }
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(testRecipient)) {
+        return res.status(400).json({ error: "Invalid email format" });
+      }
+      
+      // Get current email settings
+      const emailSettings = await storage.getEmailSettings();
+      
+      // Create a mock registration data for testing
+      const mockRegistrationData = {
+        registration: {
+          id: "test-registration",
+          firstName: "Test",
+          lastName: "User",
+          email: testRecipient,
+          phone: "(555) 123-4567",
+          emergencyContact: "Emergency Contact",
+          emergencyPhone: "(555) 987-6543",
+          classId: "test-class",
+          userId: null,
+          discountCode: null,
+          discountCodeId: null,
+          paymentIntentId: null,
+          amountPaid: null,
+          status: "confirmed" as const,
+          registrationDate: new Date().toISOString().split('T')[0],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        classData: {
+          id: "test-class",
+          title: "Test CPR Training Class",
+          type: "BLS" as const,
+          classTypeId: "test-type",
+          description: "This is a test email for your CPR training system configuration.",
+          image: null,
+          date: new Date().toISOString().split('T')[0],
+          time: "10:00",
+          duration: "4 hours",
+          capacity: 12,
+          available: 8,
+          price: 8500 // $85.00 in cents
+        },
+        paymentAmount: 85
+      };
+      
+      // Add email settings to mock data (emailSettings already loaded above)
+      mockRegistrationData.emailSettings = emailSettings;
+      
+      // Send the test email
+      const emailSent = await emailService.sendRegistrationConfirmation(mockRegistrationData);
+      
+      if (emailSent) {
+        res.json({ 
+          success: true,
+          message: `Test email sent successfully to ${testRecipient}`
+        });
+      } else {
+        res.status(500).json({ 
+          error: "Failed to send test email. Please check your email configuration." 
+        });
+      }
+    } catch (error: any) {
+      console.error("Send test email error:", error);
+      res.status(500).json({ 
+        error: "Failed to send test email", 
         message: error.message 
       });
     }

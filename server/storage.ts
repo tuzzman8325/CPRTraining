@@ -90,8 +90,12 @@ export class MemStorage implements IStorage {
     this.emailSettings = {
       id: "default-email-settings",
       senderEmail: "noreply@example.com",
+      replyToEmail: null,
       businessName: "Professional Training Services",
+      businessPhone: null,
+      businessAddress: null,
       emailSignature: "Thank you for choosing our training services!",
+      confirmationEmailTemplate: null,
       enableEmailConfirmations: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -1058,4 +1062,6 @@ export class DbStorage implements IStorage {
   }
 }
 
-export const storage = new DbStorage();
+// Use MemStorage by default as per development guidelines
+// Only use DbStorage if explicitly configured for database usage
+export const storage = process.env.USE_DATABASE === 'true' ? new DbStorage() : new MemStorage();
