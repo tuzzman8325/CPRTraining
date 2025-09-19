@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -218,6 +218,7 @@ function AdminDashboardContent() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const clientsPerPage = 10;
+  const clientSectionRef = useRef<HTMLDivElement>(null);
   
   // Class state
   const [classSearchTerm, setClassSearchTerm] = useState('');
@@ -869,6 +870,35 @@ function AdminDashboardContent() {
   // Reset to page 1 when filters change
   const resetPagination = () => {
     setCurrentPage(1);
+  };
+
+  // Scroll to client section top
+  const scrollToClientTop = () => {
+    clientSectionRef.current?.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'start' 
+    });
+  };
+
+  // Handle pagination with scroll to top
+  const handlePreviousPage = () => {
+    setCurrentPage(prev => {
+      const newPage = Math.max(1, prev - 1);
+      if (newPage !== prev) {
+        setTimeout(() => scrollToClientTop(), 50); // Small delay to ensure state update
+      }
+      return newPage;
+    });
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => {
+      const newPage = Math.min(totalPages, prev + 1);
+      if (newPage !== prev) {
+        setTimeout(() => scrollToClientTop(), 50); // Small delay to ensure state update
+      }
+      return newPage;
+    });
   };
   
   const filteredClasses = classes.filter(classItem =>
@@ -1636,7 +1666,7 @@ function AdminDashboardContent() {
 
         {/* Client Management */}
         <Collapsible open={openSection === 'clients'} onOpenChange={() => toggleSection('clients')}>
-          <Card>
+          <Card ref={clientSectionRef}>
             <CollapsibleTrigger className="w-full">
               <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" data-testid="section-header-clients">
                 <div className="flex items-center justify-between">
@@ -1962,7 +1992,7 @@ function AdminDashboardContent() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        onClick={handlePreviousPage}
                         disabled={currentPage === 1}
                         data-testid="button-previous-page"
                       >
@@ -1972,7 +2002,7 @@ function AdminDashboardContent() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        onClick={handleNextPage}
                         disabled={currentPage === totalPages}
                         data-testid="button-next-page"
                       >
