@@ -493,10 +493,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const classData = insertClassSchema.parse(req.body);
       
-      // Remove the old type field since we only use classTypeId now
-      const { type, ...filteredClassData } = classData;
+      // Derive type from classTypeId for backward compatibility
+      let derivedType = classData.type; // Use provided type if available
+      if (classData.classTypeId && !derivedType) {
+        const classType = await storage.getClassTypeById(classData.classTypeId);
+        if (!classType) {
+          return res.status(400).json({ error: "Invalid classTypeId - class type not found" });
+        }
+        derivedType = classType.name as any; // Map to enum value
+      }
       
-      const newClass = await storage.createClass(filteredClassData);
+      // Validate that type and classTypeId are consistent if both provided
+      if (classData.type && classData.classTypeId) {
+        const classType = await storage.getClassTypeById(classData.classTypeId);
+        if (classType && classType.name !== classData.type) {
+          return res.status(400).json({ error: "Type and classTypeId are inconsistent" });
+        }
+      }
+      
+      if (!derivedType) {
+        return res.status(400).json({ error: "Either type or valid classTypeId must be provided" });
+      }
+      
+      const classDataWithType = {
+        ...classData,
+        type: derivedType
+      };
+      
+      const newClass = await storage.createClass(classDataWithType);
       
       res.status(201).json({ 
         success: true, 
@@ -517,10 +541,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const updates = insertClassSchema.partial().parse(req.body);
       
-      // Remove the old type field since we only use classTypeId now
-      const { type, ...filteredUpdates } = updates;
+      // Derive type from classTypeId for backward compatibility if needed
+      let updatesWithType = { ...updates };
+      if (updates.classTypeId && !updates.type) {
+        const classType = await storage.getClassTypeById(updates.classTypeId);
+        if (!classType) {
+          return res.status(400).json({ error: "Invalid classTypeId - class type not found" });
+        }
+        updatesWithType.type = classType.name as any; // Map to enum value
+      }
       
-      const updatedClass = await storage.updateClass(id, filteredUpdates);
+      // Validate that type and classTypeId are consistent if both provided
+      if (updates.type && updates.classTypeId) {
+        const classType = await storage.getClassTypeById(updates.classTypeId);
+        if (classType && classType.name !== updates.type) {
+          return res.status(400).json({ error: "Type and classTypeId are inconsistent" });
+        }
+      }
+      
+      const updatedClass = await storage.updateClass(id, updatesWithType);
       
       if (!updatedClass) {
         return res.status(404).json({ error: "Class not found" });
@@ -632,17 +671,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Processing client record...");
       const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
       const classDate = classData.date; // Class date for certification tracking
-      const courseType = classData.type; // BLS or Heartsaver
+      const classTypeId = classData.classTypeId; // Use classTypeId for consistency
       
       // Check if client already exists by email
       let client = await storage.getClientByEmail(registrationData.email);
       
       if (client) {
         console.log("Updating existing client:", client.id);
-        // Update existing client - add course to completedCourses and update lastCourseDate
-        const updatedCompletedCourses = [...client.completedCourses];
-        if (!updatedCompletedCourses.includes(courseType)) {
-          updatedCompletedCourses.push(courseType);
+        // Update existing client - add classTypeId to completedCourses and update lastCourseDate
+        // First, deduplicate by removing any legacy entries for the same course type
+        let updatedCompletedCourses = [...client.completedCourses];
+        if (classTypeId) {
+          const classType = await storage.getClassTypeById(classTypeId);
+          if (classType) {
+            // Remove any legacy entries that match this course type
+            updatedCompletedCourses = updatedCompletedCourses.filter(entry => {
+              // Keep entries that don't match this course type
+              return entry !== classType.name && entry !== classType.badgeLabel && entry !== classTypeId;
+            });
+            
+            // Add the canonical classTypeId if not already present
+            if (!updatedCompletedCourses.includes(classTypeId)) {
+              updatedCompletedCourses.push(classTypeId);
+            }
+          }
         }
         
         // Calculate certification status based on 2-year rule
@@ -668,7 +720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone: registrationData.phone,
           registrationDate: currentDate,
           lastCourseDate: classDate,
-          completedCourses: [courseType],
+          completedCourses: classTypeId ? [classTypeId] : [],
           certificationStatus: "active" as "active" | "update" | "expired"
         };
         

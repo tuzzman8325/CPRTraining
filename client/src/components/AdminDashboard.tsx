@@ -1725,17 +1725,41 @@ function AdminDashboardContent() {
                           
                           {client.completedCourses.length > 0 && (
                             <div className="flex gap-1 flex-wrap">
-                              {client.completedCourses.map((courseId, idx) => {
-                                const classItem = classes.find(c => c.id === courseId);
-                                const classType = classTypes.find(ct => ct.id === classItem?.classTypeId);
-                                const badgeColor = (classType?.badgeColor || 'outline') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
-                                const displayName = classType?.badgeLabel || classItem?.type || courseId;
-                                return (
-                                  <Badge key={idx} variant={badgeColor} className="text-xs">
-                                    {displayName}
+                              {(() => {
+                                // Deduplicate by classType.id to prevent duplicate badges
+                                const seenClassTypeIds = new Set<string>();
+                                const uniqueBadges: { classType: any; badgeColor: string; displayName: string }[] = [];
+                                
+                                client.completedCourses.forEach((entry) => {
+                                  // Backward compatibility: handle classType.id, class.id, or course type names
+                                  let classType = classTypes.find(ct => ct.id === entry); // Try classType.id first (preferred)
+                                  if (!classType) {
+                                    // Legacy support: try class.id -> classType.id
+                                    const classItem = classes.find(c => c.id === entry);
+                                    if (classItem) {
+                                      classType = classTypes.find(ct => ct.id === classItem.classTypeId);
+                                    }
+                                  }
+                                  if (!classType) {
+                                    // Legacy support: try course type names or badgeLabels
+                                    classType = classTypes.find(ct => ct.badgeLabel === entry || ct.name === entry);
+                                  }
+                                  
+                                  // Only add if we haven't seen this classType.id before
+                                  if (classType && !seenClassTypeIds.has(classType.id)) {
+                                    seenClassTypeIds.add(classType.id);
+                                    const badgeColor = (classType.badgeColor || 'outline') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
+                                    const displayName = classType.badgeLabel || entry;
+                                    uniqueBadges.push({ classType, badgeColor, displayName });
+                                  }
+                                });
+                                
+                                return uniqueBadges.map((badge, idx) => (
+                                  <Badge key={idx} variant={badge.badgeColor} className="text-xs">
+                                    {badge.displayName}
                                   </Badge>
-                                );
-                              })}
+                                ));
+                              })()}
                             </div>
                           )}
                           
@@ -1819,17 +1843,41 @@ function AdminDashboardContent() {
                               </TableCell>
                               <TableCell className="py-3">
                                 <div className="flex gap-1 flex-wrap">
-                                  {client.completedCourses.length > 0 ? client.completedCourses.map((courseId, idx) => {
-                                    const classItem = classes.find(c => c.id === courseId);
-                                    const classType = classTypes.find(ct => ct.id === classItem?.classTypeId);
-                                    const badgeColor = (classType?.badgeColor || 'outline') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
-                                    const displayName = classType?.badgeLabel || classItem?.type || courseId;
-                                    return (
-                                      <Badge key={idx} variant={badgeColor} className="text-xs">
-                                        {displayName}
+                                  {client.completedCourses.length > 0 ? (() => {
+                                    // Deduplicate by classType.id to prevent duplicate badges
+                                    const seenClassTypeIds = new Set<string>();
+                                    const uniqueBadges: { classType: any; badgeColor: string; displayName: string }[] = [];
+                                    
+                                    client.completedCourses.forEach((entry) => {
+                                      // Backward compatibility: handle classType.id, class.id, or course type names
+                                      let classType = classTypes.find(ct => ct.id === entry); // Try classType.id first (preferred)
+                                      if (!classType) {
+                                        // Legacy support: try class.id -> classType.id
+                                        const classItem = classes.find(c => c.id === entry);
+                                        if (classItem) {
+                                          classType = classTypes.find(ct => ct.id === classItem.classTypeId);
+                                        }
+                                      }
+                                      if (!classType) {
+                                        // Legacy support: try course type names or badgeLabels
+                                        classType = classTypes.find(ct => ct.badgeLabel === entry || ct.name === entry);
+                                      }
+                                      
+                                      // Only add if we haven't seen this classType.id before
+                                      if (classType && !seenClassTypeIds.has(classType.id)) {
+                                        seenClassTypeIds.add(classType.id);
+                                        const badgeColor = (classType.badgeColor || 'outline') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
+                                        const displayName = classType.badgeLabel || entry;
+                                        uniqueBadges.push({ classType, badgeColor, displayName });
+                                      }
+                                    });
+                                    
+                                    return uniqueBadges.map((badge, idx) => (
+                                      <Badge key={idx} variant={badge.badgeColor} className="text-xs">
+                                        {badge.displayName}
                                       </Badge>
-                                    );
-                                  }) : (
+                                    ));
+                                  })() : (
                                     <span className="text-sm text-muted-foreground">None</span>
                                   )}
                                 </div>
@@ -3062,33 +3110,37 @@ function AdminDashboardContent() {
                     name="completedCourses"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Completed Courses</FormLabel>
+                        <FormLabel>Completed Course Types</FormLabel>
                         <FormDescription>
-                          Select all courses this client has completed
+                          Select all course types this client has completed (from registrations or manual assignment)
                         </FormDescription>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
-                          {classes.map((classItem) => (
-                            <div key={classItem.id} className="flex items-center space-x-2">
+                          {classTypes.map((classType) => (
+                            <div key={classType.id} className="flex items-center space-x-2">
                               <input
                                 type="checkbox"
-                                id={`edit-course-${classItem.id}`}
-                                checked={field.value?.includes(classItem.id) || false}
+                                id={`edit-course-type-${classType.id}`}
+                                checked={field.value?.includes(classType.id) || false}
                                 onChange={(e) => {
                                   const current = field.value || [];
+                                  const classTypeId = classType.id;
                                   if (e.target.checked) {
                                     // Only add if not already present
-                                    if (!current.includes(classItem.id)) {
-                                      field.onChange([...current, classItem.id]);
+                                    if (!current.includes(classTypeId)) {
+                                      field.onChange([...current, classTypeId]);
                                     }
                                   } else {
-                                    // Remove the course
-                                    field.onChange(current.filter(c => c !== classItem.id));
+                                    // Remove the course type
+                                    field.onChange(current.filter(c => c !== classTypeId));
                                   }
                                 }}
-                                data-testid={`checkbox-edit-course-${classItem.id}`}
+                                data-testid={`checkbox-edit-course-type-${classType.id}`}
                               />
-                              <Label htmlFor={`edit-course-${classItem.id}`} className="text-sm leading-tight">
-                                {classItem.title}
+                              <Label htmlFor={`edit-course-type-${classType.id}`} className="text-sm leading-tight flex items-center gap-2">
+                                <Badge variant={classType.badgeColor as any} className="text-xs">
+                                  {classType.badgeLabel}
+                                </Badge>
+                                <span>{classType.description}</span>
                               </Label>
                             </div>
                           ))}
@@ -3879,33 +3931,37 @@ function AdminDashboardContent() {
                   name="completedCourses"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Completed Courses</FormLabel>
+                      <FormLabel>Completed Course Types</FormLabel>
                       <FormDescription>
-                        Select all courses this client has completed
+                        Select all course types this client has completed
                       </FormDescription>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
-                        {classes.map((classItem) => (
-                          <div key={classItem.id} className="flex items-center space-x-2">
+                        {classTypes.map((classType) => (
+                          <div key={classType.id} className="flex items-center space-x-2">
                             <input
                               type="checkbox"
-                              id={`add-course-${classItem.id}`}
-                              checked={field.value?.includes(classItem.id) || false}
+                              id={`add-course-type-${classType.id}`}
+                              checked={field.value?.includes(classType.id) || false}
                               onChange={(e) => {
                                 const current = field.value || [];
+                                const classTypeId = classType.id;
                                 if (e.target.checked) {
                                   // Only add if not already present
-                                  if (!current.includes(classItem.id)) {
-                                    field.onChange([...current, classItem.id]);
+                                  if (!current.includes(classTypeId)) {
+                                    field.onChange([...current, classTypeId]);
                                   }
                                 } else {
-                                  // Remove the course
-                                  field.onChange(current.filter(c => c !== classItem.id));
+                                  // Remove the course type
+                                  field.onChange(current.filter(c => c !== classTypeId));
                                 }
                               }}
-                              data-testid={`checkbox-add-course-${classItem.id}`}
+                              data-testid={`checkbox-add-course-type-${classType.id}`}
                             />
-                            <Label htmlFor={`add-course-${classItem.id}`} className="text-sm leading-tight">
-                              {classItem.title}
+                            <Label htmlFor={`add-course-type-${classType.id}`} className="text-sm leading-tight flex items-center gap-2">
+                              <Badge variant={classType.badgeColor as any} className="text-xs">
+                                {classType.badgeLabel}
+                              </Badge>
+                              <span>{classType.description}</span>
                             </Label>
                           </div>
                         ))}
