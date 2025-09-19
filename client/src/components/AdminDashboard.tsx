@@ -151,21 +151,38 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Shield,
-  UserMinus
+  UserMinus,
+  BarChart3
 } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger
+} from '@/components/ui/sidebar';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
-export default function AdminDashboard() {
+// Inner component that uses sidebar context
+function AdminDashboardContent() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   
   // Collapsible section state - only one section open at a time
   const [openSection, setOpenSection] = useState<string>('');
+  
+  // Mobile detection - safe to use here since we're inside SidebarProvider
+  const isMobile = useIsMobile();
   
   // Client state
   const [searchTerm, setSearchTerm] = useState('');
@@ -1053,99 +1070,140 @@ export default function AdminDashboard() {
     setOpenSection(openSection === section ? '' : section);
   };
 
-  return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage your CPR training clients, classes and records</p>
+  // Sidebar Statistics Component using proper Shadcn components
+  const DashboardSidebar = () => (
+    <Sidebar collapsible="icon" className="border-r">
+      <SidebarHeader className="border-b">
+        <div className="flex items-center space-x-2 p-2">
+          <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+            <BarChart3 className="h-5 w-5 text-primary" />
+          </div>
+          <div className="group-data-[collapsible=icon]:hidden">
+            <h2 className="font-semibold text-sm">Dashboard Totals</h2>
+            <p className="text-xs text-muted-foreground">Overview</p>
           </div>
         </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Statistics</SidebarGroupLabel>
+          <SidebarGroupContent className="space-y-2" role="region" aria-label="Dashboard statistics">
+            {/* Total Clients */}
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Clients</p>
+                  <p className="text-lg font-bold">{stats.totalClients}</p>
+                </div>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Card>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-8 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalClients}</div>
-            </CardContent>
-          </Card>
+            {/* Active Clients */}
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Active Clients</p>
+                  <p className="text-lg font-bold">{stats.activeClients}</p>
+                </div>
+                <Award className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Card>
+
+            {/* Total Classes */}
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Classes</p>
+                  <p className="text-lg font-bold">{stats.totalClasses}</p>
+                </div>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Card>
+
+            {/* Available Spots */}
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Available Spots</p>
+                  <p className="text-lg font-bold">{stats.availableSpots}</p>
+                </div>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Card>
+
+            {/* Total Registrations */}
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Registrations</p>
+                  <p className="text-lg font-bold">{stats.totalRegistrations}</p>
+                </div>
+                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Card>
+
+            {/* Pending Registrations */}
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Pending Registrations</p>
+                  <p className="text-lg font-bold">{stats.pendingRegistrations}</p>
+                </div>
+                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Card>
+
+            {/* Total Certifications */}
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Certifications</p>
+                  <p className="text-lg font-bold">{stats.totalCertifications}</p>
+                </div>
+                <Award className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Card>
+
+            {/* Monthly Revenue */}
+            <Card className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Monthly Revenue</p>
+                  <p className="text-lg font-bold">${stats.monthlyRevenue.toLocaleString()}</p>
+                </div>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </Card>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  );
+
+  return (
+    <div className="flex h-screen w-full">
+        <DashboardSidebar />
+        <SidebarInset className="flex flex-col flex-1 bg-muted/30">
+          {/* Header with Sidebar Toggle */}
+          <header className="flex items-center justify-between p-4 border-b bg-background sticky top-0 z-10">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger 
+                size="icon" 
+                data-testid="button-sidebar-toggle"
+                aria-label="Toggle dashboard sidebar"
+                className="shrink-0"
+              />
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold truncate">Admin Dashboard</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Manage your CPR training clients, classes and records</p>
+              </div>
+            </div>
+          </header>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Clients</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeClients}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Classes</CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalClasses}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Available Spots</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.availableSpots}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Certifications</CardTitle>
-              <Award className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalCertifications}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
-              <ClipboardList className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalRegistrations}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Registrations</CardTitle>
-              <ClipboardList className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pendingRegistrations}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${stats.monthlyRevenue}</div>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Main Content Area */}
+          <main className="flex-1 overflow-auto">
+            <div className="container mx-auto p-6 space-y-6">
 
         {/* User Management */}
         <Collapsible open={openSection === 'users'} onOpenChange={() => toggleSection('users')}>
@@ -3862,7 +3920,30 @@ export default function AdminDashboard() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+            </div>
+          </main>
+        </SidebarInset>
       </div>
-    </div>
+  );
+}
+
+// Outer component that provides SidebarProvider context
+export default function AdminDashboard() {
+  const isMobile = useIsMobile();
+  
+  // Custom sidebar width for better stats display
+  const sidebarStyle = {
+    "--sidebar-width": "20rem",       // 320px for better content
+    "--sidebar-width-icon": "4rem",   // default icon width
+  };
+
+  return (
+    <SidebarProvider 
+      style={sidebarStyle as React.CSSProperties}
+      defaultOpen={!isMobile}
+      className="min-h-screen"
+    >
+      <AdminDashboardContent />
+    </SidebarProvider>
   );
 }
