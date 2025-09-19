@@ -3,7 +3,7 @@ import { pgTable, text, varchar, date, integer, pgEnum, timestamp, boolean, json
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const classTypeEnum = pgEnum("class_type", ["BLS", "Heartsaver"]);
+export const classTypeEnum = pgEnum("class_type", ["BLS", "Heartsaver", "ACLS", "BLS/AED"]);
 
 // Dynamic class types table for flexible type management
 export const classTypes = pgTable("class_types", {
