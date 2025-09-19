@@ -642,8 +642,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           discountCode = discountCodes.find(dc => dc.id === registrationData.discountCodeId) || null;
         }
         
-        // Calculate payment amount (convert from cents to dollars for email display)
-        const paymentAmount = registrationData.amountPaid ? registrationData.amountPaid / 100 : undefined;
+        // Payment amount in cents (as expected by email service)
+        const paymentAmount = registrationData.amountPaid;
         
         // Load email settings for dynamic configuration
         const emailSettings = await storage.getEmailSettings().catch((error) => {
@@ -1084,6 +1084,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate the request body using zod schema
       const updates = insertEmailSettingsSchema.partial().parse(req.body);
       
+      // Server-side security validation for email settings
+      if (updates.senderEmail) {
+        // Email format validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const dangerousChars = /[\r\n\0]/;
+        
+        if (!emailRegex.test(updates.senderEmail) || dangerousChars.test(updates.senderEmail) || updates.senderEmail.length > 254) {
+          return res.status(400).json({ 
+            error: "Invalid sender email format or potential security issue detected" 
+          });
+        }
+        
+        // Email deliverability validation - ENFORCE sender email to match authenticated Gmail account
+        const authenticatedGmailUser = process.env.GMAIL_USER;
+        if (authenticatedGmailUser && updates.senderEmail !== authenticatedGmailUser) {
+          console.warn(`[EMAIL_SECURITY] Blocking sender email change from ${updates.senderEmail} - must use authenticated Gmail account ${authenticatedGmailUser}`);
+          return res.status(400).json({ 
+            error: `For security and deliverability, sender email must match your authenticated Gmail account. The system will automatically use the authenticated email address.`,
+            enforcedEmail: authenticatedGmailUser
+          });
+        }
+      }
+      
+      if (updates.replyToEmail) {
+        // Reply-to email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const dangerousChars = /[\r\n\0]/;
+        
+        if (!emailRegex.test(updates.replyToEmail) || dangerousChars.test(updates.replyToEmail) || updates.replyToEmail.length > 254) {
+          return res.status(400).json({ 
+            error: "Invalid reply-to email format or potential security issue detected" 
+          });
+        }
+      }
+      
+      // Sanitize business information fields to prevent malicious content
+      if (updates.businessName) {
+        // Basic sanitization - remove potentially dangerous characters
+        if (/[\r\n\0<>]/g.test(updates.businessName)) {
+          return res.status(400).json({ 
+            error: "Business name contains invalid characters" 
+          });
+        }
+        if (updates.businessName.length > 200) {
+          return res.status(400).json({ 
+            error: "Business name is too long (maximum 200 characters)" 
+          });
+        }
+      }
+      
+      if (updates.businessPhone) {
+        // Phone number sanitization
+        if (/[\r\n\0<>]/g.test(updates.businessPhone)) {
+          return res.status(400).json({ 
+            error: "Business phone contains invalid characters" 
+          });
+        }
+        if (updates.businessPhone.length > 50) {
+          return res.status(400).json({ 
+            error: "Business phone is too long (maximum 50 characters)" 
+          });
+        }
+      }
+      
+      if (updates.businessAddress) {
+        // Address sanitization
+        if (/[\r\n\0<>]/g.test(updates.businessAddress)) {
+          return res.status(400).json({ 
+            error: "Business address contains invalid characters" 
+          });
+        }
+        if (updates.businessAddress.length > 500) {
+          return res.status(400).json({ 
+            error: "Business address is too long (maximum 500 characters)" 
+          });
+        }
+      }
+      
+      if (updates.emailSignature) {
+        // Email signature sanitization
+        if (/[\r\n\0<>]/g.test(updates.emailSignature)) {
+          return res.status(400).json({ 
+            error: "Email signature contains invalid characters" 
+          });
+        }
+        if (updates.emailSignature.length > 1000) {
+          return res.status(400).json({ 
+            error: "Email signature is too long (maximum 1000 characters)" 
+          });
+        }
+      }
+      
+      if (updates.confirmationEmailTemplate) {
+        // Email template length validation (prevent extremely large templates)
+        if (updates.confirmationEmailTemplate.length > 50000) {
+          return res.status(400).json({ 
+            error: "Email template is too long (maximum 50000 characters)" 
+          });
+        }
+        
+        // Validate template content for security (using same validation as EmailService)
+        const dangerousPatterns = [
+          /<script[^>]*>.*?<\/script>/gsi,
+          /javascript:/gi,
+          /on\w+\s*=/gi, // onclick, onload, etc.
+          /<iframe[^>]*>/gi,
+          /<object[^>]*>/gi,
+          /<embed[^>]*>/gi,
+          /<form[^>]*>/gi,
+          /<input[^>]*>/gi
+        ];
+        
+        for (const pattern of dangerousPatterns) {
+          if (pattern.test(updates.confirmationEmailTemplate)) {
+            return res.status(400).json({ 
+              error: "Email template contains potentially dangerous HTML content. Please remove scripts, forms, inputs, and other interactive elements."
+            });
+          }
+        }
+        
+        // Validate placeholders are properly formatted
+        const placeholderPattern = /{{[^}]+}}/g;
+        const placeholders = updates.confirmationEmailTemplate.match(placeholderPattern) || [];
+        const validPlaceholders = [
+          'STUDENT_FIRST_NAME', 'STUDENT_LAST_NAME', 'STUDENT_EMAIL', 'STUDENT_PHONE',
+          'CLASS_TITLE', 'CLASS_TYPE', 'CLASS_DATE', 'CLASS_TIME', 'CLASS_DURATION',
+          'CLASS_ORIGINAL_PRICE', 'PAYMENT_AMOUNT', 'PAYMENT_STATUS', 'PAYMENT_ID',
+          'REGISTRATION_ID', 'DISCOUNT_CODE', 'DISCOUNT_DESCRIPTION',
+          'BUSINESS_NAME', 'BUSINESS_PHONE', 'BUSINESS_ADDRESS', 'EMAIL_SIGNATURE'
+        ];
+        
+        for (const placeholder of placeholders) {
+          const cleanPlaceholder = placeholder.replace(/[{}]/g, '');
+          if (!validPlaceholders.includes(cleanPlaceholder)) {
+            return res.status(400).json({ 
+              error: `Invalid placeholder found: ${placeholder}. Please use only supported placeholders.`
+            });
+          }
+        }
+      }
+      
       const updatedSettings = await storage.updateEmailSettings(updates);
       
       res.json({ 
@@ -1150,7 +1291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           available: 8,
           price: 8500 // $85.00 in cents
         },
-        paymentAmount: 85.00, // Amount in dollars (converted from cents in registration route)
+        paymentAmount: 8500, // Amount in cents
         emailSettings
       };
       
@@ -1232,7 +1373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           available: 8,
           price: 8500 // $85.00 in cents
         },
-        paymentAmount: 85
+        paymentAmount: 8500 // Amount in cents
       };
       
       // Add email settings to mock data (emailSettings already loaded above)

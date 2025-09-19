@@ -2472,19 +2472,36 @@ function AdminDashboardContent() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="senderEmail" data-testid="label-sender-email">Sender Email Address</Label>
+                          <Label htmlFor="senderEmail" data-testid="label-sender-email">
+                            Sender Email Address 
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              ENFORCED BY SYSTEM
+                            </Badge>
+                          </Label>
                           <Input
                             id="senderEmail"
                             type="email"
-                            placeholder="noreply@example.com"
+                            placeholder="Automatically uses Gmail authentication email"
                             value={emailSettings.senderEmail}
-                            onChange={(e) => {
-                              updateEmailSettingsMutation.mutate({
-                                senderEmail: e.target.value
-                              });
-                            }}
+                            disabled
+                            className="opacity-75 cursor-not-allowed"
                             data-testid="input-sender-email"
                           />
+                          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mt-2">
+                            <div className="flex">
+                              <div className="flex-shrink-0">
+                                <Shield className="h-5 w-5 text-amber-600" />
+                              </div>
+                              <div className="ml-3">
+                                <p className="text-sm font-medium text-amber-800">
+                                  Security Enforcement Active
+                                </p>
+                                <p className="text-sm text-amber-700 mt-1">
+                                  For security and deliverability, the From address is automatically set to your authenticated Gmail account. This prevents email spoofing and ensures reliable delivery.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
                         <div>
@@ -2501,6 +2518,9 @@ function AdminDashboardContent() {
                             }}
                             data-testid="input-reply-to-email"
                           />
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Use your business email here. Replies will be sent to this address instead of the sender address.
+                          </p>
                         </div>
 
                         <div>

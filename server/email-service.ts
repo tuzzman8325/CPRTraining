@@ -12,7 +12,7 @@ export interface RegistrationEmailData {
   registration: Registration;
   classData: Class;
   discountCode?: DiscountCode | null;
-  paymentAmount?: number; // Amount in dollars (converted from cents)
+  paymentAmount?: number; // Amount in cents
   emailSettings?: EmailSettings; // Optional email settings for dynamic configuration
 }
 
@@ -353,7 +353,7 @@ export class EmailService {
 
             <div class="payment-section">
                 <h3 style="margin-top: 0; color: #0369a1;">Payment Details</h3>
-                ${classData.price !== (paymentAmount || 0) * 100 ? `
+                ${classData.price !== (paymentAmount || 0) ? `
                 <div class="detail-row">
                     <span class="detail-label">Original Price:</span>
                     <span class="detail-value">${originalPrice}</span>
@@ -431,7 +431,7 @@ export class EmailService {
     const finalAmount = paymentAmount !== undefined ? this.formatCurrency(paymentAmount) : 'Pending';
 
     return `
-${businessName.toUpperCase()} - REGISTRATION CONFIRMATION
+${this.escapeHtml(businessName).toUpperCase()} - REGISTRATION CONFIRMATION
 
 Hello ${this.escapeHtml(registration.firstName)} ${this.escapeHtml(registration.lastName)},
 
@@ -448,7 +448,7 @@ CLASS INFORMATION:
 ${discountCode ? `DISCOUNT APPLIED: ${this.escapeHtml(discountCode.code)}${discountCode.description ? ` - ${this.escapeHtml(discountCode.description)}` : ''}` : ''}
 
 PAYMENT DETAILS:
-${classData.price !== (paymentAmount || 0) * 100 ? `- Original Price: ${originalPrice}` : ''}
+${classData.price !== (paymentAmount || 0) ? `- Original Price: ${originalPrice}` : ''}
 - Amount Paid: ${finalAmount}
 - Payment Status: ${registration.status === 'confirmed' ? 'Confirmed' : 'Pending'}
 ${registration.paymentIntentId ? `- Payment ID: ${this.escapeHtml(registration.paymentIntentId)}` : ''}
@@ -466,19 +466,71 @@ If you have any questions or need to make changes to your registration, please c
 
 We look forward to seeing you in class!
 
-CPR Training Pro Team
+${this.escapeHtml(businessName)} Team
 
 CONTACT INFORMATION:
-Email: info@cprtrainingpro.com
-Phone: (555) 123-4567
-Website: www.cprtrainingpro.com
+${emailSettings?.replyToEmail ? `Email: ${this.escapeHtml(emailSettings.replyToEmail)}` : ''}
+${businessPhone ? `Phone: ${this.escapeHtml(businessPhone)}` : ''}
+${businessAddress ? `Address: ${this.escapeHtml(businessAddress)}` : ''}
 
 This is an automated confirmation email. Please save this email for your records.
     `;
   }
 
+  // Validate custom template content for security
+  private validateCustomTemplate(template: string): { isValid: boolean; error?: string } {
+    if (!template || typeof template !== 'string') {
+      return { isValid: false, error: 'Template is empty or invalid' };
+    }
+    
+    // Check for potentially dangerous content
+    const dangerousPatterns = [
+      /<script[^>]*>.*?<\/script>/gsi,
+      /javascript:/gi,
+      /on\w+\s*=/gi, // onclick, onload, etc.
+      /<iframe[^>]*>/gi,
+      /<object[^>]*>/gi,
+      /<embed[^>]*>/gi,
+      /<form[^>]*>/gi,
+      /<input[^>]*>/gi
+    ];
+    
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(template)) {
+        return { isValid: false, error: 'Template contains potentially dangerous HTML content' };
+      }
+    }
+    
+    // Validate that placeholders are properly formatted
+    const placeholderPattern = /{{[^}]+}}/g;
+    const placeholders = template.match(placeholderPattern) || [];
+    const validPlaceholders = [
+      'STUDENT_FIRST_NAME', 'STUDENT_LAST_NAME', 'STUDENT_EMAIL', 'STUDENT_PHONE',
+      'CLASS_TITLE', 'CLASS_TYPE', 'CLASS_DATE', 'CLASS_TIME', 'CLASS_DURATION',
+      'CLASS_ORIGINAL_PRICE', 'PAYMENT_AMOUNT', 'PAYMENT_STATUS', 'PAYMENT_ID',
+      'REGISTRATION_ID', 'DISCOUNT_CODE', 'DISCOUNT_DESCRIPTION',
+      'BUSINESS_NAME', 'BUSINESS_PHONE', 'BUSINESS_ADDRESS', 'EMAIL_SIGNATURE'
+    ];
+    
+    for (const placeholder of placeholders) {
+      const cleanPlaceholder = placeholder.replace(/[{}]/g, '');
+      if (!validPlaceholders.includes(cleanPlaceholder)) {
+        return { isValid: false, error: `Invalid placeholder: ${placeholder}` };
+      }
+    }
+    
+    return { isValid: true };
+  }
+  
   // Generate custom template HTML by replacing placeholders
   private generateCustomTemplateHTML(data: RegistrationEmailData, template: string): string {
+    // Validate template content first
+    const validation = this.validateCustomTemplate(template);
+    if (!validation.isValid) {
+      console.error('[EMAIL_SECURITY] Custom template validation failed:', validation.error);
+      throw new Error(`Template validation failed: ${validation.error}`);
+    }
+    
     const { registration, classData, discountCode, paymentAmount, emailSettings } = data;
     
     // Create replacement object with all available data
@@ -517,6 +569,13 @@ This is an automated confirmation email. Please save this email for your records
 
   // Generate custom template text by replacing placeholders
   private generateCustomTemplateText(data: RegistrationEmailData, template: string): string {
+    // Validate template content first
+    const validation = this.validateCustomTemplate(template);
+    if (!validation.isValid) {
+      console.error('[EMAIL_SECURITY] Custom template validation failed:', validation.error);
+      throw new Error(`Template validation failed: ${validation.error}`);
+    }
+    
     // Convert HTML template to plain text and then process placeholders
     const textTemplate = template
       .replace(/<[^>]*>/g, '') // Remove HTML tags
@@ -579,12 +638,23 @@ This is an automated confirmation email. Please save this email for your records
         return { success: false, error: 'Invalid email address' };
       }
       
-      // Use configurable settings with fallbacks
+      // SECURITY: Always enforce Gmail user for From address (deliverability)
       const businessName = emailSettings?.businessName || 'CPR Training Center';
-      const senderEmail = emailSettings?.senderEmail || process.env.GMAIL_USER!;
+      const senderEmail = process.env.GMAIL_USER!; // ENFORCED: Always use authenticated Gmail account
       const replyToEmail = emailSettings?.replyToEmail || senderEmail;
       
-      const subject = `Registration Confirmed - ${classData.title} on ${this.formatDate(classData.date)}`;
+      // Validate From and Reply-To addresses at send time
+      if (!this.validateEmailAddress(senderEmail)) {
+        console.error('[EMAIL_SECURITY] Invalid From email address:', senderEmail);
+        return { success: false, error: 'Invalid From email address configuration' };
+      }
+      
+      if (replyToEmail && !this.validateEmailAddress(replyToEmail)) {
+        console.error('[EMAIL_SECURITY] Invalid Reply-To email address:', replyToEmail);
+        return { success: false, error: 'Invalid Reply-To email address configuration' };
+      }
+      
+      const subject = `Registration Confirmed - ${this.escapeHtml(classData.title)} on ${this.formatDate(classData.date)}`;
       
       // Use custom template if provided, otherwise use default
       let htmlContent: string;
@@ -651,9 +721,14 @@ This is an automated confirmation email. Please save this email for your records
     }
 
     try {
-      const { registration, classData } = data;
+      const { registration, classData, emailSettings } = data;
       
-      const subject = `Class Reminder - ${classData.title} Tomorrow`;
+      // Use configurable settings with fallbacks
+      const businessName = emailSettings?.businessName || 'CPR Training Center';
+      const senderEmail = emailSettings?.senderEmail || process.env.GMAIL_USER!;
+      const replyToEmail = emailSettings?.replyToEmail || senderEmail;
+      
+      const subject = `Class Reminder - ${this.escapeHtml(classData.title)} Tomorrow`;
       
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -667,19 +742,24 @@ This is an automated confirmation email. Please save this email for your records
           </ul>
           <p>Please arrive 15 minutes early and bring a valid photo ID.</p>
           <p>See you tomorrow!</p>
-          <p><strong>CPR Training Pro Team</strong></p>
+          <p><strong>${this.escapeHtml(businessName)} Team</strong></p>
         </div>
       `;
 
-      const mailOptions = {
+      const mailOptions: any = {
         from: {
-          name: 'CPR Training Pro',
-          address: process.env.GMAIL_USER!
+          name: businessName,
+          address: senderEmail
         },
         to: registration.email,
         subject: subject,
         html: htmlContent
       };
+
+      // Add reply-to if different from sender
+      if (replyToEmail && replyToEmail !== senderEmail) {
+        mailOptions.replyTo = replyToEmail;
+      }
 
       const info = await this.transporter.sendMail(mailOptions);
       
@@ -701,29 +781,45 @@ This is an automated confirmation email. Please save this email for your records
   }
 
   // Test email functionality
-  public async sendTestEmail(to: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  public async sendTestEmail(to: string, emailSettings?: { businessName?: string; senderEmail?: string; replyToEmail?: string; }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.isConfigured) {
       console.warn('[EMAIL_CONFIG] Email service not configured - cannot send test email');
       return { success: false, error: 'Email service not configured' };
     }
 
     try {
-      const mailOptions = {
+      // Validate recipient email address
+      if (!this.validateEmailAddress(to)) {
+        console.error('[EMAIL_SECURITY] Invalid or potentially malicious email address:', to);
+        return { success: false, error: 'Invalid email address' };
+      }
+      
+      // Use configurable settings with fallbacks
+      const businessName = emailSettings?.businessName || 'CPR Training Center';
+      const senderEmail = emailSettings?.senderEmail || process.env.GMAIL_USER!;
+      const replyToEmail = emailSettings?.replyToEmail || senderEmail;
+      
+      const mailOptions: any = {
         from: {
-          name: 'CPR Training Pro',
-          address: process.env.GMAIL_USER!
+          name: businessName,
+          address: senderEmail
         },
         to: to,
-        subject: 'Email Service Test - CPR Training Pro',
+        subject: `Email Service Test - ${this.escapeHtml(businessName)}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #dc2626;">Email Service Test</h2>
             <p>If you're reading this, the email service is working correctly!</p>
-            <p>CPR Training Pro email system is ready to send registration confirmations.</p>
-            <p><strong>CPR Training Pro Team</strong></p>
+            <p>${this.escapeHtml(businessName)} email system is ready to send registration confirmations.</p>
+            <p><strong>${this.escapeHtml(businessName)} Team</strong></p>
           </div>
         `
       };
+
+      // Add reply-to if different from sender
+      if (replyToEmail && replyToEmail !== senderEmail) {
+        mailOptions.replyTo = replyToEmail;
+      }
 
       const info = await this.transporter.sendMail(mailOptions);
       
