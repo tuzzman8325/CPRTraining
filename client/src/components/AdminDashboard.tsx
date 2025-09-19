@@ -1960,9 +1960,16 @@ function AdminDashboardContent() {
                         <TableRow key={classItem.id} data-testid={`row-class-${classItem.id}`}>
                           <TableCell className="font-medium">{classItem.title}</TableCell>
                           <TableCell>
-                            <Badge variant={classItem.type === 'BLS' ? 'default' : 'secondary'}>
-                              {classItem.type}
-                            </Badge>
+                            {(() => {
+                              const classType = classTypes.find(ct => ct.id === classItem.classTypeId);
+                              const badgeColor = (classType?.badgeColor || 'default') as 'default' | 'secondary' | 'destructive' | 'outline';
+                              const badgeLabel = classType?.badgeLabel || classItem.type;
+                              return (
+                                <Badge variant={badgeColor}>
+                                  {badgeLabel}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>{classItem.date}</TableCell>
                           <TableCell>{classItem.time}</TableCell>
