@@ -779,7 +779,9 @@ function AdminDashboardContent() {
       name: '',
       displayName: '',
       description: '',
-      isActive: true
+      isActive: true,
+      badgeLabel: '',
+      badgeColor: 'default'
     }
   });
 
@@ -1016,7 +1018,9 @@ function AdminDashboardContent() {
       name: classType.name,
       displayName: classType.displayName,
       description: classType.description || '',
-      isActive: classType.isActive
+      isActive: classType.isActive,
+      badgeLabel: classType.badgeLabel,
+      badgeColor: classType.badgeColor
     });
     setIsEditClassTypeDialogOpen(true);
   };
@@ -3981,6 +3985,54 @@ function AdminDashboardContent() {
                   )}
                 />
                 
+                <FormField
+                  control={addClassTypeForm.control}
+                  name="badgeLabel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Badge Label</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g. BLS, CPR, ACLS"
+                          {...field} 
+                          data-testid="input-badge-label"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Short text displayed on the badge (e.g., "BLS", "CPR")
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={addClassTypeForm.control}
+                  name="badgeColor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Badge Color</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-badge-color">
+                            <SelectValue placeholder="Select badge color" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="default">Red (Default)</SelectItem>
+                          <SelectItem value="secondary">Gray (Secondary)</SelectItem>
+                          <SelectItem value="destructive">Red (Destructive)</SelectItem>
+                          <SelectItem value="outline">Outlined</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Color theme for the badge display
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
                 <DialogFooter>
                   <Button 
                     type="button"
@@ -4088,6 +4140,54 @@ function AdminDashboardContent() {
                             data-testid="switch-edit-classtype-active"
                           />
                         </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editClassTypeForm.control}
+                    name="badgeLabel"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Badge Label</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g. BLS, CPR, ACLS"
+                            {...field} 
+                            data-testid="input-edit-badge-label"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Short text displayed on the badge (e.g., "BLS", "CPR")
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editClassTypeForm.control}
+                    name="badgeColor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Badge Color</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-edit-badge-color">
+                              <SelectValue placeholder="Select badge color" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="default">Red (Default)</SelectItem>
+                            <SelectItem value="secondary">Gray (Secondary)</SelectItem>
+                            <SelectItem value="destructive">Red (Destructive)</SelectItem>
+                            <SelectItem value="outline">Outlined</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Color theme for the badge display
+                        </FormDescription>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
