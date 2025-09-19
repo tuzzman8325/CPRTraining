@@ -456,15 +456,18 @@ function AdminDashboardContent() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<InsertClient> }) => {
       return await apiRequest('PUT', `/api/clients/${id}`, data);
     },
-    onSuccess: async () => {
-      // Invalidate and refetch clients data to ensure fresh state
-      await queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/clients'] });
+    onSuccess: () => {
+      // Invalidate clients cache to force fresh data fetch
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       
-      // Clear form state completely
-      editClientForm.reset();
-      setIsEditDialogOpen(false);
-      setSelectedClient(null);
+      // Small delay to ensure cache invalidation completes before closing dialog
+      setTimeout(() => {
+        // Clear form state completely
+        editClientForm.reset();
+        setIsEditDialogOpen(false);
+        setSelectedClient(null);
+      }, 100);
+      
       toast({ title: "Success", description: "Client updated successfully" });
     },
     onError: (error) => {
@@ -3073,8 +3076,12 @@ function AdminDashboardContent() {
                                 onChange={(e) => {
                                   const current = field.value || [];
                                   if (e.target.checked) {
-                                    field.onChange([...current.filter(c => c !== classItem.id), classItem.id]);
+                                    // Only add if not already present
+                                    if (!current.includes(classItem.id)) {
+                                      field.onChange([...current, classItem.id]);
+                                    }
                                   } else {
+                                    // Remove the course
                                     field.onChange(current.filter(c => c !== classItem.id));
                                   }
                                 }}
@@ -3886,8 +3893,12 @@ function AdminDashboardContent() {
                               onChange={(e) => {
                                 const current = field.value || [];
                                 if (e.target.checked) {
-                                  field.onChange([...current.filter(c => c !== classItem.id), classItem.id]);
+                                  // Only add if not already present
+                                  if (!current.includes(classItem.id)) {
+                                    field.onChange([...current, classItem.id]);
+                                  }
                                 } else {
+                                  // Remove the course
                                   field.onChange(current.filter(c => c !== classItem.id));
                                 }
                               }}
