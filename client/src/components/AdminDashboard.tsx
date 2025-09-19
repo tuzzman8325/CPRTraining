@@ -165,7 +165,7 @@ export default function AdminDashboard() {
   const { user: currentUser } = useAuth();
   
   // Collapsible section state - only one section open at a time
-  const [openSection, setOpenSection] = useState<string>('clients');
+  const [openSection, setOpenSection] = useState<string>('');
   
   // Client state
   const [searchTerm, setSearchTerm] = useState('');
@@ -1150,24 +1150,31 @@ export default function AdminDashboard() {
         {/* User Management */}
         <Collapsible open={openSection === 'users'} onOpenChange={() => toggleSection('users')}>
           <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-users">
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" data-testid="section-header-users">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      User Management
-                    </CardTitle>
-                    <CardDescription>Manage user accounts and permissions</CardDescription>
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <CardTitle className="text-lg">User Management</CardTitle>
+                      <CardDescription>
+                        Manage user accounts and permissions
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center space-x-4">
+                    <Badge variant="outline" className="hidden sm:inline-flex">
+                      {users.length} users
+                    </Badge>
                     {openSection === 'users' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </div>
                 </div>
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent className="space-y-4">
+              <CardContent className="pt-0 space-y-4">
                 {/* Search */}
                 <div className="relative max-w-md">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -1434,38 +1441,33 @@ export default function AdminDashboard() {
         {/* Client Management */}
         <Collapsible open={openSection === 'clients'} onOpenChange={() => toggleSection('clients')}>
           <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-clients">
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" data-testid="section-header-clients">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Client Management
-                    </CardTitle>
-                    <CardDescription>View and manage all registered clients</CardDescription>
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <CardTitle className="text-lg">Client Management</CardTitle>
+                      <CardDescription>
+                        View and manage all registered clients
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddClient();
-                      }} 
-                      size="sm"
-                      data-testid="button-add-client"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Client
-                    </Button>
+                  <div className="flex items-center space-x-4">
+                    <Badge variant="outline" className="hidden sm:inline-flex">
+                      {clients.length} clients
+                    </Badge>
                     {openSection === 'clients' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </div>
                 </div>
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent className="space-y-4">
-                {/* Search and Quick Filter */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1 max-w-md">
+              <CardContent className="pt-0 space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                  <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search clients..."
@@ -1478,6 +1480,17 @@ export default function AdminDashboard() {
                       data-testid="input-search-clients"
                     />
                   </div>
+                  <Button 
+                    onClick={handleAddClient}
+                    data-testid="button-add-client"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Client
+                  </Button>
+                </div>
+                
+                {/* Quick Filter */}
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Select 
                     value={clientFilters.certificationStatus} 
                     onValueChange={(value) => {
@@ -1721,45 +1734,49 @@ export default function AdminDashboard() {
         {/* Class Management */}
         <Collapsible open={openSection === 'classes'} onOpenChange={() => toggleSection('classes')}>
           <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-classes">
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" data-testid="section-header-classes">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5" />
-                      Class Management
-                    </CardTitle>
-                    <CardDescription>View and manage all training classes</CardDescription>
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <CardTitle className="text-lg">Class Management</CardTitle>
+                      <CardDescription>
+                        View and manage all training classes
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddClass();
-                      }} 
-                      size="sm"
-                      data-testid="button-add-class"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Class
-                    </Button>
+                  <div className="flex items-center space-x-4">
+                    <Badge variant="outline" className="hidden sm:inline-flex">
+                      {classes.length} classes
+                    </Badge>
                     {openSection === 'classes' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </div>
                 </div>
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent>
-            {/* Search */}
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search classes by title or type..."
-                value={classSearchTerm}
-                onChange={(e) => setClassSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-classes"
-              />
+              <CardContent className="pt-0">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search classes by title or type..."
+                  value={classSearchTerm}
+                  onChange={(e) => setClassSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-classes"
+                />
+              </div>
+              <Button 
+                onClick={handleAddClass}
+                data-testid="button-add-class"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Class
+              </Button>
             </div>
 
             {/* Classes Table */}
@@ -1861,22 +1878,31 @@ export default function AdminDashboard() {
         {/* Registration Management */}
         <Collapsible open={openSection === 'registrations'} onOpenChange={() => toggleSection('registrations')}>
           <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-registrations">
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" data-testid="section-header-registrations">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <ClipboardList className="h-5 w-5" />
-                      Registration Management
-                    </CardTitle>
-                    <CardDescription>View and manage all class registrations</CardDescription>
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <ClipboardList className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <CardTitle className="text-lg">Registration Management</CardTitle>
+                      <CardDescription>
+                        View and manage all class registrations
+                      </CardDescription>
+                    </div>
                   </div>
-                  {openSection === 'registrations' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <div className="flex items-center space-x-4">
+                    <Badge variant="outline" className="hidden sm:inline-flex">
+                      {registrations.length} registrations
+                    </Badge>
+                    {openSection === 'registrations' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
                 </div>
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent>
+              <CardContent className="pt-0">
             {/* Search */}
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1993,45 +2019,49 @@ export default function AdminDashboard() {
         {/* Discount Code Management */}
         <Collapsible open={openSection === 'discount-codes'} onOpenChange={() => toggleSection('discount-codes')}>
           <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover-elevate" data-testid="section-header-discount-codes">
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" data-testid="section-header-discount-codes">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Ticket className="h-5 w-5" />
-                      Discount Code Management
-                    </CardTitle>
-                    <CardDescription>Create and manage discount codes for free class registrations</CardDescription>
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Ticket className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <CardTitle className="text-lg">Discount Code Management</CardTitle>
+                      <CardDescription>
+                        Create and manage discount codes for free class registrations
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddDiscountCode();
-                      }} 
-                      size="sm"
-                      data-testid="button-add-discount-code"
-                    >
-                      <Ticket className="h-4 w-4 mr-2" />
-                      Add Discount Code
-                    </Button>
+                  <div className="flex items-center space-x-4">
+                    <Badge variant="outline" className="hidden sm:inline-flex">
+                      {discountCodes.length} codes
+                    </Badge>
                     {openSection === 'discount-codes' ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </div>
                 </div>
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent>
-            {/* Search */}
-            <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search discount codes by code or description..."
-                value={discountCodeSearchTerm}
-                onChange={(e) => setDiscountCodeSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-discount-codes"
-              />
+              <CardContent className="pt-0">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search discount codes by code or description..."
+                  value={discountCodeSearchTerm}
+                  onChange={(e) => setDiscountCodeSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-discount-codes"
+                />
+              </div>
+              <Button 
+                onClick={handleAddDiscountCode}
+                data-testid="button-add-discount-code"
+              >
+                <Ticket className="mr-2 h-4 w-4" />
+                Add Discount Code
+              </Button>
             </div>
 
             {/* Discount Codes Table */}
