@@ -3029,41 +3029,28 @@ function AdminDashboardContent() {
                         <FormDescription>
                           Select all courses this client has completed
                         </FormDescription>
-                        <div className="flex gap-4">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id="course-bls"
-                              checked={field.value?.includes('BLS') || false}
-                              onChange={(e) => {
-                                const current = field.value || [];
-                                if (e.target.checked) {
-                                  field.onChange([...current.filter(c => c !== 'BLS'), 'BLS']);
-                                } else {
-                                  field.onChange(current.filter(c => c !== 'BLS'));
-                                }
-                              }}
-                              data-testid="checkbox-course-bls"
-                            />
-                            <Label htmlFor="course-bls">BLS Provider</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id="course-heartsaver"
-                              checked={field.value?.includes('Heartsaver') || false}
-                              onChange={(e) => {
-                                const current = field.value || [];
-                                if (e.target.checked) {
-                                  field.onChange([...current.filter(c => c !== 'Heartsaver'), 'Heartsaver']);
-                                } else {
-                                  field.onChange(current.filter(c => c !== 'Heartsaver'));
-                                }
-                              }}
-                              data-testid="checkbox-course-heartsaver"
-                            />
-                            <Label htmlFor="course-heartsaver">Heartsaver CPR</Label>
-                          </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
+                          {classes.map((classItem) => (
+                            <div key={classItem.id} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`edit-course-${classItem.id}`}
+                                checked={field.value?.includes(classItem.id) || false}
+                                onChange={(e) => {
+                                  const current = field.value || [];
+                                  if (e.target.checked) {
+                                    field.onChange([...current.filter(c => c !== classItem.id), classItem.id]);
+                                  } else {
+                                    field.onChange(current.filter(c => c !== classItem.id));
+                                  }
+                                }}
+                                data-testid={`checkbox-edit-course-${classItem.id}`}
+                              />
+                              <Label htmlFor={`edit-course-${classItem.id}`} className="text-sm leading-tight">
+                                {classItem.title}
+                              </Label>
+                            </div>
+                          ))}
                         </div>
                         <FormMessage />
                       </FormItem>
@@ -3917,41 +3904,28 @@ function AdminDashboardContent() {
                       <FormDescription>
                         Select all courses this client has completed
                       </FormDescription>
-                      <div className="flex gap-4">
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="add-course-bls"
-                            checked={field.value?.includes('BLS') || false}
-                            onChange={(e) => {
-                              const current = field.value || [];
-                              if (e.target.checked) {
-                                field.onChange([...current.filter(c => c !== 'BLS'), 'BLS']);
-                              } else {
-                                field.onChange(current.filter(c => c !== 'BLS'));
-                              }
-                            }}
-                            data-testid="checkbox-add-course-bls"
-                          />
-                          <Label htmlFor="add-course-bls">BLS Provider</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="add-course-heartsaver"
-                            checked={field.value?.includes('Heartsaver') || false}
-                            onChange={(e) => {
-                              const current = field.value || [];
-                              if (e.target.checked) {
-                                field.onChange([...current.filter(c => c !== 'Heartsaver'), 'Heartsaver']);
-                              } else {
-                                field.onChange(current.filter(c => c !== 'Heartsaver'));
-                              }
-                            }}
-                            data-testid="checkbox-add-course-heartsaver"
-                          />
-                          <Label htmlFor="add-course-heartsaver">Heartsaver CPR</Label>
-                        </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
+                        {classes.map((classItem) => (
+                          <div key={classItem.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`add-course-${classItem.id}`}
+                              checked={field.value?.includes(classItem.id) || false}
+                              onChange={(e) => {
+                                const current = field.value || [];
+                                if (e.target.checked) {
+                                  field.onChange([...current.filter(c => c !== classItem.id), classItem.id]);
+                                } else {
+                                  field.onChange(current.filter(c => c !== classItem.id));
+                                }
+                              }}
+                              data-testid={`checkbox-add-course-${classItem.id}`}
+                            />
+                            <Label htmlFor={`add-course-${classItem.id}`} className="text-sm leading-tight">
+                              {classItem.title}
+                            </Label>
+                          </div>
+                        ))}
                       </div>
                       <FormMessage />
                     </FormItem>
