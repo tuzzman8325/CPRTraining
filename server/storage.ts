@@ -1,7 +1,7 @@
-import { type User, type InsertUser, type UpsertUser, type Class, type InsertClass, type ClassType, type InsertClassType, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode, type Client, type InsertClient } from "@shared/schema";
+import { type User, type InsertUser, type UpsertUser, type Class, type InsertClass, type ClassType, type InsertClassType, type Registration, type InsertRegistration, type DiscountCode, type InsertDiscountCode, type Client, type InsertClient, type EmailSettings, type InsertEmailSettings } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { users, classes, classTypes, registrations, discountCodes, clients } from "@shared/schema";
+import { users, classes, classTypes, registrations, discountCodes, clients, emailSettings } from "@shared/schema";
 import { eq, sql, and, lt } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
@@ -63,6 +63,10 @@ export interface IStorage {
   deleteClient(id: string): Promise<boolean>;
   updateClientCertificationStatus(id: string, lastCourseDate: string, completedCourses: string[]): Promise<Client | undefined>;
   getClientsByCertificationStatus(status: "active" | "update" | "expired"): Promise<Client[]>;
+  
+  // Email Settings operations
+  getEmailSettings(): Promise<EmailSettings>;
+  updateEmailSettings(updates: Partial<InsertEmailSettings>): Promise<EmailSettings>;
 }
 
 export class MemStorage implements IStorage {
@@ -72,6 +76,7 @@ export class MemStorage implements IStorage {
   private registrations: Map<string, Registration>;
   private discountCodes: Map<string, DiscountCode>;
   private clients: Map<string, Client>;
+  private emailSettings: EmailSettings;
 
   constructor() {
     this.users = new Map();
@@ -80,6 +85,17 @@ export class MemStorage implements IStorage {
     this.registrations = new Map();
     this.discountCodes = new Map();
     this.clients = new Map();
+    
+    // Initialize default email settings
+    this.emailSettings = {
+      id: "default-email-settings",
+      senderEmail: "noreply@example.com",
+      businessName: "Professional Training Services",
+      emailSignature: "Thank you for choosing our training services!",
+      enableEmailConfirmations: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
     
     // Initialize default class types for backward compatibility
     this.initializeDefaultClassTypes();
@@ -580,6 +596,20 @@ export class MemStorage implements IStorage {
   async getClientsByCertificationStatus(status: "active" | "update" | "expired"): Promise<Client[]> {
     return Array.from(this.clients.values()).filter(client => client.certificationStatus === status);
   }
+  
+  // Email Settings operations
+  async getEmailSettings(): Promise<EmailSettings> {
+    return this.emailSettings;
+  }
+  
+  async updateEmailSettings(updates: Partial<InsertEmailSettings>): Promise<EmailSettings> {
+    this.emailSettings = {
+      ...this.emailSettings,
+      ...updates,
+      updatedAt: new Date()
+    };
+    return this.emailSettings;
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -992,6 +1022,39 @@ export class DbStorage implements IStorage {
 
   async getClientsByCertificationStatus(status: "active" | "update" | "expired"): Promise<Client[]> {
     return await db.select().from(clients).where(eq(clients.certificationStatus, status));
+  }
+  
+  // Email Settings operations
+  async getEmailSettings(): Promise<EmailSettings> {
+    // Try to get existing settings, create default if none exist
+    let result = await db.select().from(emailSettings).limit(1);
+    
+    if (result.length === 0) {
+      // Create default email settings
+      const defaultSettings = {
+        senderEmail: "noreply@example.com",
+        businessName: "Professional Training Services",
+        emailSignature: "Thank you for choosing our training services!",
+        enableEmailConfirmations: true,
+      };
+      
+      const inserted = await db.insert(emailSettings).values(defaultSettings).returning();
+      return inserted[0];
+    }
+    
+    return result[0];
+  }
+  
+  async updateEmailSettings(updates: Partial<InsertEmailSettings>): Promise<EmailSettings> {
+    // First ensure we have settings to update
+    const current = await this.getEmailSettings();
+    
+    const result = await db.update(emailSettings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(emailSettings.id, current.id))
+      .returning();
+    
+    return result[0];
   }
 }
 

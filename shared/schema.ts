@@ -97,6 +97,17 @@ export const clients = pgTable("clients", {
   updatedAt: timestamp("updated_at").notNull().default(sql`NOW()`),
 });
 
+// Email settings table for configurable email preferences
+export const emailSettings = pgTable("email_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderEmail: text("sender_email").notNull().default("noreply@example.com"),
+  businessName: text("business_name").notNull().default("Professional Training Services"),
+  emailSignature: text("email_signature").default("Thank you for choosing our training services!"),
+  enableEmailConfirmations: boolean("enable_email_confirmations").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`NOW()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`NOW()`),
+});
+
 // Replit Auth user schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
@@ -152,6 +163,12 @@ export const insertClientSchema = createInsertSchema(clients).omit({
   lastCourseDate: z.string().min(1, "Last course date is required"),
 });
 
+export const insertEmailSettingsSchema = createInsertSchema(emailSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -170,3 +187,6 @@ export type DiscountCode = typeof discountCodes.$inferSelect;
 
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+
+export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
+export type EmailSettings = typeof emailSettings.$inferSelect;
