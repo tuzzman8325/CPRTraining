@@ -12,7 +12,7 @@ export const classTypes = pgTable("class_types", {
   displayName: text("display_name").notNull(), // e.g., "Basic Life Support", "Heartsaver CPR/AED"
   description: text("description"), // Optional detailed description
   badgeLabel: text("badge_label").notNull(), // Custom badge text, e.g., "BLS", "CPR", "ACLS"
-  badgeColor: text("badge_color").notNull().default("default").$type<'default' | 'secondary' | 'destructive' | 'outline'>(), // Badge color: default, secondary, destructive, outline
+  badgeColor: text("badge_color").notNull().default("default").$type<'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline'>(), // Badge color with 10 distinct options
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`NOW()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`NOW()`),
@@ -129,8 +129,8 @@ export const upsertUserSchema = createInsertSchema(users).pick({
   role: true,
 });
 
-// Badge color enum for validation
-const badgeColorEnum = z.enum(['default', 'secondary', 'destructive', 'outline']);
+// Badge color enum for validation - 10 distinct colors
+const badgeColorEnum = z.enum(['default', 'secondary', 'destructive', 'success', 'warning', 'info', 'purple', 'pink', 'teal', 'outline']);
 
 export const insertClassTypeSchema = createInsertSchema(classTypes).omit({
   id: true,

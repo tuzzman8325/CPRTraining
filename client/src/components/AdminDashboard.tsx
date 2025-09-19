@@ -1962,7 +1962,7 @@ function AdminDashboardContent() {
                           <TableCell>
                             {(() => {
                               const classType = classTypes.find(ct => ct.id === classItem.classTypeId);
-                              const badgeColor = (classType?.badgeColor || 'default') as 'default' | 'secondary' | 'destructive' | 'outline';
+                              const badgeColor = (classType?.badgeColor || 'default') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
                               const badgeLabel = classType?.badgeLabel || classItem.type;
                               return (
                                 <Badge variant={badgeColor}>
@@ -4030,6 +4030,12 @@ function AdminDashboardContent() {
                           <SelectItem value="default">Red (Default)</SelectItem>
                           <SelectItem value="secondary">Gray (Secondary)</SelectItem>
                           <SelectItem value="destructive">Red (Destructive)</SelectItem>
+                          <SelectItem value="success">Green (Success)</SelectItem>
+                          <SelectItem value="warning">Yellow (Warning)</SelectItem>
+                          <SelectItem value="info">Blue (Info)</SelectItem>
+                          <SelectItem value="purple">Purple</SelectItem>
+                          <SelectItem value="pink">Pink</SelectItem>
+                          <SelectItem value="teal">Teal</SelectItem>
                           <SelectItem value="outline">Outlined</SelectItem>
                         </SelectContent>
                       </Select>
@@ -4191,6 +4197,12 @@ function AdminDashboardContent() {
                             <SelectItem value="default">Red (Default)</SelectItem>
                             <SelectItem value="secondary">Gray (Secondary)</SelectItem>
                             <SelectItem value="destructive">Red (Destructive)</SelectItem>
+                            <SelectItem value="success">Green (Success)</SelectItem>
+                            <SelectItem value="warning">Yellow (Warning)</SelectItem>
+                            <SelectItem value="info">Blue (Info)</SelectItem>
+                            <SelectItem value="purple">Purple</SelectItem>
+                            <SelectItem value="pink">Pink</SelectItem>
+                            <SelectItem value="teal">Teal</SelectItem>
                             <SelectItem value="outline">Outlined</SelectItem>
                           </SelectContent>
                         </Select>
