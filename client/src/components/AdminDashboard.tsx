@@ -1161,7 +1161,7 @@ function AdminDashboardContent() {
             {/* Total Clients */}
             <Card className="p-3">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="text-xs text-muted-foreground">Total Clients</p>
                   <p className="text-lg font-bold">{stats.totalClients}</p>
                 </div>
@@ -1172,7 +1172,7 @@ function AdminDashboardContent() {
             {/* Active Clients */}
             <Card className="p-3">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="text-xs text-muted-foreground">Active Clients</p>
                   <p className="text-lg font-bold">{stats.activeClients}</p>
                 </div>
@@ -1183,7 +1183,7 @@ function AdminDashboardContent() {
             {/* Total Classes */}
             <Card className="p-3">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="text-xs text-muted-foreground">Total Classes</p>
                   <p className="text-lg font-bold">{stats.totalClasses}</p>
                 </div>
@@ -1194,7 +1194,7 @@ function AdminDashboardContent() {
             {/* Available Spots */}
             <Card className="p-3">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="text-xs text-muted-foreground">Available Spots</p>
                   <p className="text-lg font-bold">{stats.availableSpots}</p>
                 </div>
@@ -1205,7 +1205,7 @@ function AdminDashboardContent() {
             {/* Total Registrations */}
             <Card className="p-3">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="text-xs text-muted-foreground">Total Registrations</p>
                   <p className="text-lg font-bold">{stats.totalRegistrations}</p>
                 </div>
@@ -1216,7 +1216,7 @@ function AdminDashboardContent() {
             {/* Pending Registrations */}
             <Card className="p-3">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="text-xs text-muted-foreground">Pending Registrations</p>
                   <p className="text-lg font-bold">{stats.pendingRegistrations}</p>
                 </div>
@@ -1227,7 +1227,7 @@ function AdminDashboardContent() {
             {/* Total Certifications */}
             <Card className="p-3">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="text-xs text-muted-foreground">Total Certifications</p>
                   <p className="text-lg font-bold">{stats.totalCertifications}</p>
                 </div>
@@ -1238,7 +1238,7 @@ function AdminDashboardContent() {
             {/* Monthly Revenue */}
             <Card className="p-3">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="group-data-[collapsible=icon]:hidden">
                   <p className="text-xs text-muted-foreground">Monthly Revenue</p>
                   <p className="text-lg font-bold">${stats.monthlyRevenue.toLocaleString()}</p>
                 </div>
@@ -4249,7 +4249,7 @@ export default function AdminDashboard() {
   return (
     <SidebarProvider 
       style={sidebarStyle as React.CSSProperties}
-      defaultOpen={!isMobile}
+      defaultOpen={false}
       className="min-h-screen"
     >
       <AdminDashboardContent />
