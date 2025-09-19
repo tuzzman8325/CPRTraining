@@ -1712,11 +1712,17 @@ function AdminDashboardContent() {
                           
                           {client.completedCourses.length > 0 && (
                             <div className="flex gap-1 flex-wrap">
-                              {client.completedCourses.map((course, idx) => (
-                                <Badge key={idx} variant="outline" className="text-xs">
-                                  {course}
-                                </Badge>
-                              ))}
+                              {client.completedCourses.map((courseId, idx) => {
+                                const classItem = classes.find(c => c.id === courseId);
+                                const classType = classTypes.find(ct => ct.id === classItem?.classTypeId);
+                                const badgeColor = (classType?.badgeColor || 'outline') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
+                                const displayName = classType?.badgeLabel || classItem?.type || courseId;
+                                return (
+                                  <Badge key={idx} variant={badgeColor} className="text-xs">
+                                    {displayName}
+                                  </Badge>
+                                );
+                              })}
                             </div>
                           )}
                           
@@ -1800,11 +1806,17 @@ function AdminDashboardContent() {
                               </TableCell>
                               <TableCell className="py-3">
                                 <div className="flex gap-1 flex-wrap">
-                                  {client.completedCourses.length > 0 ? client.completedCourses.map((course, idx) => (
-                                    <Badge key={idx} variant="outline" className="text-xs">
-                                      {course}
-                                    </Badge>
-                                  )) : (
+                                  {client.completedCourses.length > 0 ? client.completedCourses.map((courseId, idx) => {
+                                    const classItem = classes.find(c => c.id === courseId);
+                                    const classType = classTypes.find(ct => ct.id === classItem?.classTypeId);
+                                    const badgeColor = (classType?.badgeColor || 'outline') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
+                                    const displayName = classType?.badgeLabel || classItem?.type || courseId;
+                                    return (
+                                      <Badge key={idx} variant={badgeColor} className="text-xs">
+                                        {displayName}
+                                      </Badge>
+                                    );
+                                  }) : (
                                     <span className="text-sm text-muted-foreground">None</span>
                                   )}
                                 </div>
