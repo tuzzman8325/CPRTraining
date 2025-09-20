@@ -833,13 +833,6 @@ function AdminDashboardContent() {
       `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Certification status filter - use per-class statuses for accurate filtering
-    const overallStatus = calculateOverallClientStatus(clientClassStatuses);
-    const matchesCertificationStatus = 
-      clientFilters.certificationStatus === 'all' ||
-      overallStatus === clientFilters.certificationStatus;
-
-    // Course type filter
     // Get per-class statuses for this client for accurate filtering
     const clientClassStatuses = getClientClassStatuses(
       client.email,
@@ -847,6 +840,12 @@ function AdminDashboardContent() {
       classes,
       classTypes
     );
+
+    // Certification status filter - use per-class statuses for accurate filtering
+    const overallStatus = calculateOverallClientStatus(clientClassStatuses);
+    const matchesCertificationStatus = 
+      clientFilters.certificationStatus === 'all' ||
+      overallStatus === clientFilters.certificationStatus;
     
     // Extract class type names for filtering
     const completedClassTypes = clientClassStatuses.map(cs => cs.classType.name.toLowerCase());
