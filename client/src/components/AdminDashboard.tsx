@@ -1015,6 +1015,7 @@ function AdminDashboardContent() {
     return statuses.sort((a, b) => a.classType.displayName.localeCompare(b.classType.displayName));
   };
 
+
   // Calculate overall client status from individual class statuses (for legacy filters)
   const calculateOverallClientStatus = (classStatuses: ClassStatus[]): 'active' | 'update' | 'expired' => {
     if (classStatuses.length === 0) return 'expired';
