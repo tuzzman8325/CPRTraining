@@ -825,6 +825,94 @@ function AdminDashboardContent() {
     }
   };
 
+  // Utility to compute per-class certification statuses for each client
+  type ClassStatus = {
+    classTypeId: string;
+    classType: ClassType;
+    status: 'valid' | 'renewal-due' | 'expired';
+    lastCompletionDate: string;
+    expirationDate: string;
+    daysUntilExpiration: number;
+  };
+
+  const getClientClassStatuses = (
+    clientEmail: string,
+    registrations: Registration[],
+    classes: Class[],
+    classTypes: ClassType[],
+    validityMonths: number = 24,
+    renewalWindowDays: number = 60
+  ): ClassStatus[] => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0); // Normalize to noon to avoid time-of-day issues
+    
+    // Find all confirmed registrations for this client
+    const clientRegistrations = registrations.filter(
+      reg => reg.email === clientEmail && reg.status === 'confirmed'
+    );
+
+    // Group by classTypeId and find most recent COMPLETED class per class type
+    const classCompletions = new Map<string, { date: string; classId: string }>();
+    
+    clientRegistrations.forEach(registration => {
+      const classItem = classes.find(c => c.id === registration.classId);
+      if (!classItem || !classItem.classTypeId) return;
+      
+      // Only count classes that have already occurred (completion date)
+      const classDate = parseDateLocal(classItem.date);
+      if (classDate > today) return; // Skip future classes
+      
+      const existing = classCompletions.get(classItem.classTypeId);
+      
+      if (!existing || classDate > parseDateLocal(existing.date)) {
+        classCompletions.set(classItem.classTypeId, {
+          date: classItem.date, // Use class date, not registration date
+          classId: classItem.id
+        });
+      }
+    });
+
+    // Calculate status for each completed class type
+    const statuses: ClassStatus[] = [];
+
+    classCompletions.forEach((completion, classTypeId) => {
+      const classType = classTypes.find(ct => ct.id === classTypeId);
+      if (!classType) return;
+
+      const completionDate = parseDateLocal(completion.date);
+      const expirationDate = new Date(completionDate);
+      expirationDate.setMonth(expirationDate.getMonth() + validityMonths);
+      expirationDate.setHours(12, 0, 0, 0); // Normalize to noon
+      
+      const renewalDate = new Date(expirationDate);
+      renewalDate.setDate(renewalDate.getDate() - renewalWindowDays);
+      renewalDate.setHours(12, 0, 0, 0); // Normalize to noon
+
+      const timeDiff = expirationDate.getTime() - today.getTime();
+      const daysUntilExpiration = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+      let status: 'valid' | 'renewal-due' | 'expired';
+      if (today >= expirationDate) {
+        status = 'expired';
+      } else if (today >= renewalDate) {
+        status = 'renewal-due';
+      } else {
+        status = 'valid';
+      }
+
+      statuses.push({
+        classTypeId,
+        classType,
+        status,
+        lastCompletionDate: completion.date,
+        expirationDate: expirationDate.toLocaleDateString('en-CA'), // Returns YYYY-MM-DD format
+        daysUntilExpiration
+      });
+    });
+
+    return statuses.sort((a, b) => a.classType.displayName.localeCompare(b.classType.displayName));
+  };
+
   const filteredClients = clients.filter(client => {
     // Text search filter
     const matchesSearch = 
@@ -927,93 +1015,6 @@ function AdminDashboardContent() {
     return new Date(year, month - 1, day, 12, 0, 0); // Noon local time to avoid DST edge cases
   };
 
-  // Utility to compute per-class certification statuses for each client
-  type ClassStatus = {
-    classTypeId: string;
-    classType: ClassType;
-    status: 'valid' | 'renewal-due' | 'expired';
-    lastCompletionDate: string;
-    expirationDate: string;
-    daysUntilExpiration: number;
-  };
-
-  const getClientClassStatuses = (
-    clientEmail: string,
-    registrations: Registration[],
-    classes: Class[],
-    classTypes: ClassType[],
-    validityMonths: number = 24,
-    renewalWindowDays: number = 60
-  ): ClassStatus[] => {
-    const today = new Date();
-    today.setHours(12, 0, 0, 0); // Normalize to noon to avoid time-of-day issues
-    
-    // Find all confirmed registrations for this client
-    const clientRegistrations = registrations.filter(
-      reg => reg.email === clientEmail && reg.status === 'confirmed'
-    );
-
-    // Group by classTypeId and find most recent COMPLETED class per class type
-    const classCompletions = new Map<string, { date: string; classId: string }>();
-    
-    clientRegistrations.forEach(registration => {
-      const classItem = classes.find(c => c.id === registration.classId);
-      if (!classItem || !classItem.classTypeId) return;
-      
-      // Only count classes that have already occurred (completion date)
-      const classDate = parseDateLocal(classItem.date);
-      if (classDate > today) return; // Skip future classes
-      
-      const existing = classCompletions.get(classItem.classTypeId);
-      
-      if (!existing || classDate > parseDateLocal(existing.date)) {
-        classCompletions.set(classItem.classTypeId, {
-          date: classItem.date, // Use class date, not registration date
-          classId: classItem.id
-        });
-      }
-    });
-
-    // Calculate status for each completed class type
-    const statuses: ClassStatus[] = [];
-
-    classCompletions.forEach((completion, classTypeId) => {
-      const classType = classTypes.find(ct => ct.id === classTypeId);
-      if (!classType) return;
-
-      const completionDate = parseDateLocal(completion.date);
-      const expirationDate = new Date(completionDate);
-      expirationDate.setMonth(expirationDate.getMonth() + validityMonths);
-      expirationDate.setHours(12, 0, 0, 0); // Normalize to noon
-      
-      const renewalDate = new Date(expirationDate);
-      renewalDate.setDate(renewalDate.getDate() - renewalWindowDays);
-      renewalDate.setHours(12, 0, 0, 0); // Normalize to noon
-
-      const timeDiff = expirationDate.getTime() - today.getTime();
-      const daysUntilExpiration = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-      let status: 'valid' | 'renewal-due' | 'expired';
-      if (today >= expirationDate) {
-        status = 'expired';
-      } else if (today >= renewalDate) {
-        status = 'renewal-due';
-      } else {
-        status = 'valid';
-      }
-
-      statuses.push({
-        classTypeId,
-        classType,
-        status,
-        lastCompletionDate: completion.date,
-        expirationDate: expirationDate.toLocaleDateString('en-CA'), // Returns YYYY-MM-DD format
-        daysUntilExpiration
-      });
-    });
-
-    return statuses.sort((a, b) => a.classType.displayName.localeCompare(b.classType.displayName));
-  };
 
 
   // Calculate overall client status from individual class statuses (for legacy filters)
