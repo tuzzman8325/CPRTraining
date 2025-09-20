@@ -833,18 +833,32 @@ function AdminDashboardContent() {
       `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Certification status filter
+    // Certification status filter - use per-class statuses for accurate filtering
+    const overallStatus = calculateOverallClientStatus(clientClassStatuses);
     const matchesCertificationStatus = 
       clientFilters.certificationStatus === 'all' ||
-      client.certificationStatus === clientFilters.certificationStatus;
+      overallStatus === clientFilters.certificationStatus;
 
     // Course type filter
+    // Get per-class statuses for this client for accurate filtering
+    const clientClassStatuses = getClientClassStatuses(
+      client.email,
+      registrations,
+      classes,
+      classTypes
+    );
+    
+    // Extract class type names for filtering
+    const completedClassTypes = clientClassStatuses.map(cs => cs.classType.name.toLowerCase());
+    const hasBLS = completedClassTypes.some(type => type.includes('bls'));
+    const hasHeartSaver = completedClassTypes.some(type => type.includes('heartsaver'));
+    
     const matchesCourseType = 
       clientFilters.courseType === 'all' ||
-      (clientFilters.courseType === 'bls' && client.completedCourses.includes('BLS')) ||
-      (clientFilters.courseType === 'heartsaver' && client.completedCourses.includes('Heartsaver')) ||
-      (clientFilters.courseType === 'both' && client.completedCourses.includes('BLS') && client.completedCourses.includes('Heartsaver')) ||
-      (clientFilters.courseType === 'none' && client.completedCourses.length === 0);
+      (clientFilters.courseType === 'bls' && hasBLS) ||
+      (clientFilters.courseType === 'heartsaver' && hasHeartSaver) ||
+      (clientFilters.courseType === 'both' && hasBLS && hasHeartSaver) ||
+      (clientFilters.courseType === 'none' && clientClassStatuses.length === 0);
 
     // Registration date range filter
     const matchesRegistrationDate = getDateRangeFilter(
@@ -907,6 +921,113 @@ function AdminDashboardContent() {
   );
 
   const registrations = registrationsData?.registrations || [];
+  
+  // Helper function to parse date strings as local dates (avoid timezone issues)
+  const parseDateLocal = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0); // Noon local time to avoid DST edge cases
+  };
+
+  // Utility to compute per-class certification statuses for each client
+  type ClassStatus = {
+    classTypeId: string;
+    classType: ClassType;
+    status: 'valid' | 'renewal-due' | 'expired';
+    lastCompletionDate: string;
+    expirationDate: string;
+    daysUntilExpiration: number;
+  };
+
+  const getClientClassStatuses = (
+    clientEmail: string,
+    registrations: Registration[],
+    classes: Class[],
+    classTypes: ClassType[],
+    validityMonths: number = 24,
+    renewalWindowDays: number = 60
+  ): ClassStatus[] => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0); // Normalize to noon to avoid time-of-day issues
+    
+    // Find all confirmed registrations for this client
+    const clientRegistrations = registrations.filter(
+      reg => reg.email === clientEmail && reg.status === 'confirmed'
+    );
+
+    // Group by classTypeId and find most recent COMPLETED class per class type
+    const classCompletions = new Map<string, { date: string; classId: string }>();
+    
+    clientRegistrations.forEach(registration => {
+      const classItem = classes.find(c => c.id === registration.classId);
+      if (!classItem || !classItem.classTypeId) return;
+      
+      // Only count classes that have already occurred (completion date)
+      const classDate = parseDateLocal(classItem.date);
+      if (classDate > today) return; // Skip future classes
+      
+      const existing = classCompletions.get(classItem.classTypeId);
+      
+      if (!existing || classDate > parseDateLocal(existing.date)) {
+        classCompletions.set(classItem.classTypeId, {
+          date: classItem.date, // Use class date, not registration date
+          classId: classItem.id
+        });
+      }
+    });
+
+    // Calculate status for each completed class type
+    const statuses: ClassStatus[] = [];
+
+    classCompletions.forEach((completion, classTypeId) => {
+      const classType = classTypes.find(ct => ct.id === classTypeId);
+      if (!classType) return;
+
+      const completionDate = parseDateLocal(completion.date);
+      const expirationDate = new Date(completionDate);
+      expirationDate.setMonth(expirationDate.getMonth() + validityMonths);
+      expirationDate.setHours(12, 0, 0, 0); // Normalize to noon
+      
+      const renewalDate = new Date(expirationDate);
+      renewalDate.setDate(renewalDate.getDate() - renewalWindowDays);
+      renewalDate.setHours(12, 0, 0, 0); // Normalize to noon
+
+      const timeDiff = expirationDate.getTime() - today.getTime();
+      const daysUntilExpiration = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+      let status: 'valid' | 'renewal-due' | 'expired';
+      if (today >= expirationDate) {
+        status = 'expired';
+      } else if (today >= renewalDate) {
+        status = 'renewal-due';
+      } else {
+        status = 'valid';
+      }
+
+      statuses.push({
+        classTypeId,
+        classType,
+        status,
+        lastCompletionDate: completion.date,
+        expirationDate: expirationDate.toLocaleDateString('en-CA'), // Returns YYYY-MM-DD format
+        daysUntilExpiration
+      });
+    });
+
+    return statuses.sort((a, b) => a.classType.displayName.localeCompare(b.classType.displayName));
+  };
+
+  // Calculate overall client status from individual class statuses (for legacy filters)
+  const calculateOverallClientStatus = (classStatuses: ClassStatus[]): 'active' | 'update' | 'expired' => {
+    if (classStatuses.length === 0) return 'expired';
+    
+    const hasExpired = classStatuses.some(cs => cs.status === 'expired');
+    const hasRenewalDue = classStatuses.some(cs => cs.status === 'renewal-due');
+    
+    if (hasExpired) return 'expired';
+    if (hasRenewalDue) return 'update';
+    return 'active';
+  };
+
   const filteredRegistrations = registrations.filter(registration =>
     registration.firstName.toLowerCase().includes(registrationSearchTerm.toLowerCase()) ||
     registration.lastName.toLowerCase().includes(registrationSearchTerm.toLowerCase()) ||
@@ -953,6 +1074,116 @@ function AdminDashboardContent() {
     });
     
     return normalizedCourses;
+  };
+
+  // ClientClassBadge component with split-color rendering
+  const ClientClassBadge = ({ classStatus }: { classStatus: ClassStatus }) => {
+    const { classType, status, lastCompletionDate, expirationDate, daysUntilExpiration } = classStatus;
+    
+    // Ensure badgeColor is a valid variant
+    const validVariants = ['default', 'secondary', 'destructive', 'success', 'warning', 'info', 'purple', 'pink', 'teal', 'outline'] as const;
+    const badgeVariant = validVariants.includes(classType.badgeColor as any) 
+      ? classType.badgeColor as typeof validVariants[number]
+      : 'default';
+
+    // Create tooltip text
+    const formatDate = (dateStr: string) => {
+      return new Date(dateStr).toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+    };
+
+    let tooltipText = '';
+    let statusText = '';
+    let ariaSuffix = '';
+    
+    if (status === 'valid') {
+      statusText = classType.badgeLabel;
+      tooltipText = `${classType.displayName}\nCompleted: ${formatDate(lastCompletionDate)}\nExpires: ${formatDate(expirationDate)}\n${daysUntilExpiration} days remaining`;
+      ariaSuffix = `valid until ${formatDate(expirationDate)}`;
+    } else if (status === 'renewal-due') {
+      statusText = `${classType.badgeLabel} • Renew by ${formatDate(expirationDate)}`;
+      tooltipText = `${classType.displayName}\nCompleted: ${formatDate(lastCompletionDate)}\nRenewal due: ${formatDate(expirationDate)}\n${daysUntilExpiration} days to renew`;
+      ariaSuffix = `renewal due in ${daysUntilExpiration} days`;
+    } else {
+      const expiredDays = Math.abs(daysUntilExpiration);
+      statusText = `${classType.badgeLabel} • Expired ${formatDate(expirationDate)}`;
+      tooltipText = `${classType.displayName}\nCompleted: ${formatDate(lastCompletionDate)}\nExpired: ${formatDate(expirationDate)}\nExpired ${expiredDays} days ago`;
+      ariaSuffix = `expired ${expiredDays} days ago`;
+    }
+
+    // For valid status, use solid color
+    if (status === 'valid') {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge 
+              variant={badgeVariant}
+              className="text-xs whitespace-nowrap"
+              data-testid={`badge-class-${classType.id}`}
+              aria-label={`${classType.displayName} certification ${ariaSuffix}`}
+            >
+              {statusText}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="whitespace-pre-line text-sm">
+              {tooltipText}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    // For renewal-due and expired, use split-color gradient
+    const statusColor = status === 'renewal-due' ? 'warning' : 'destructive';
+    const statusBgColor = status === 'renewal-due' 
+      ? 'hsl(var(--warning))' 
+      : 'hsl(var(--destructive))';
+    
+    // Get the main color for the class type
+    const getClassColor = (variant: string) => {
+      switch (variant) {
+        case 'success': return 'hsl(var(--success))';
+        case 'warning': return 'hsl(var(--warning))';
+        case 'destructive': return 'hsl(var(--destructive))';
+        case 'info': return 'hsl(var(--info))';
+        case 'purple': return 'hsl(var(--purple))';
+        case 'pink': return 'hsl(var(--pink))';
+        case 'teal': return 'hsl(var(--teal))';
+        case 'secondary': return 'hsl(var(--secondary))';
+        case 'outline': return 'transparent';
+        default: return 'hsl(var(--primary))';
+      }
+    };
+
+    const classBgColor = getClassColor(badgeVariant);
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className="inline-flex items-center rounded-md text-xs font-medium ring-1 ring-inset px-2.5 py-0.5 whitespace-nowrap cursor-default"
+            style={{
+              background: `linear-gradient(to right, ${classBgColor} 50%, ${statusBgColor} 50%)`,
+              color: 'hsl(var(--primary-foreground))',
+              borderColor: 'hsl(var(--border))'
+            }}
+            data-testid={`badge-class-${classType.id}`}
+            aria-label={`${classType.displayName} certification ${ariaSuffix}`}
+          >
+            {statusText}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className="whitespace-pre-line text-sm">
+            {tooltipText}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    );
   };
 
   // Client handlers
@@ -1779,54 +2010,27 @@ function AdminDashboardContent() {
                                 <p className="text-sm text-muted-foreground">{client.phone}</p>
                               )}
                             </div>
-                            <Badge variant={
-                              client.certificationStatus === 'active' ? 'success' : 
-                              client.certificationStatus === 'update' ? 'warning' : 
-                              'destructive'
-                            }>
-                              {client.certificationStatus}
-                            </Badge>
-                          </div>
-                          
-                          {client.completedCourses.length > 0 && (
-                            <div className="flex gap-1 flex-wrap">
+                            <div className="flex flex-wrap gap-1">
                               {(() => {
-                                // Deduplicate by classType.id to prevent duplicate badges
-                                const seenClassTypeIds = new Set<string>();
-                                const uniqueBadges: { classType: any; badgeColor: string; displayName: string }[] = [];
-                                
-                                client.completedCourses.forEach((entry) => {
-                                  // Backward compatibility: handle classType.id, class.id, or course type names
-                                  let classType = classTypes.find(ct => ct.id === entry); // Try classType.id first (preferred)
-                                  if (!classType) {
-                                    // Legacy support: try class.id -> classType.id
-                                    const classItem = classes.find(c => c.id === entry);
-                                    if (classItem) {
-                                      classType = classTypes.find(ct => ct.id === classItem.classTypeId);
-                                    }
-                                  }
-                                  if (!classType) {
-                                    // Legacy support: try course type names or badgeLabels
-                                    classType = classTypes.find(ct => ct.badgeLabel === entry || ct.name === entry);
-                                  }
-                                  
-                                  // Only add if we haven't seen this classType.id before
-                                  if (classType && !seenClassTypeIds.has(classType.id)) {
-                                    seenClassTypeIds.add(classType.id);
-                                    const badgeColor = (classType.badgeColor || 'outline') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
-                                    const displayName = classType.badgeLabel || entry;
-                                    uniqueBadges.push({ classType, badgeColor, displayName });
-                                  }
-                                });
-                                
-                                return uniqueBadges.map((badge, idx) => (
-                                  <Badge key={idx} variant={badge.badgeColor} className="text-xs">
-                                    {badge.displayName}
-                                  </Badge>
-                                ));
+                                const classStatuses = getClientClassStatuses(
+                                  client.email,
+                                  registrations,
+                                  classes,
+                                  classTypes
+                                );
+                                return classStatuses.length > 0 ? (
+                                  classStatuses.map((classStatus) => (
+                                    <ClientClassBadge
+                                      key={classStatus.classTypeId}
+                                      classStatus={classStatus}
+                                    />
+                                  ))
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">No certifications</span>
+                                );
                               })()}
                             </div>
-                          )}
+                          </div>
                           
                           <div className="flex justify-between items-center pt-2 border-t">
                             <div className="text-xs text-muted-foreground">
@@ -1866,8 +2070,7 @@ function AdminDashboardContent() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-1/4">Client</TableHead>
-                          <TableHead className="w-1/6">Status</TableHead>
-                          <TableHead className="w-1/4">Courses</TableHead>
+                          <TableHead className="w-2/5">Certifications</TableHead>
                           <TableHead className="w-1/6">Last Course</TableHead>
                           <TableHead className="w-1/6">Actions</TableHead>
                         </TableRow>
@@ -1875,13 +2078,13 @@ function AdminDashboardContent() {
                       <TableBody>
                         {clientsLoading ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                               Loading clients...
                             </TableCell>
                           </TableRow>
                         ) : paginatedClients.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                               {filteredClients.length === 0 ? 'No clients found' : 'No clients on this page'}
                             </TableCell>
                           </TableRow>
@@ -1898,53 +2101,25 @@ function AdminDashboardContent() {
                                 </div>
                               </TableCell>
                               <TableCell className="py-3">
-                                <Badge variant={
-                                  client.certificationStatus === 'active' ? 'success' : 
-                                  client.certificationStatus === 'update' ? 'warning' : 
-                                  'destructive'
-                                }>
-                                  {client.certificationStatus}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="py-3">
-                                <div className="flex gap-1 flex-wrap">
-                                  {client.completedCourses.length > 0 ? (() => {
-                                    // Deduplicate by classType.id to prevent duplicate badges
-                                    const seenClassTypeIds = new Set<string>();
-                                    const uniqueBadges: { classType: any; badgeColor: string; displayName: string }[] = [];
-                                    
-                                    client.completedCourses.forEach((entry) => {
-                                      // Backward compatibility: handle classType.id, class.id, or course type names
-                                      let classType = classTypes.find(ct => ct.id === entry); // Try classType.id first (preferred)
-                                      if (!classType) {
-                                        // Legacy support: try class.id -> classType.id
-                                        const classItem = classes.find(c => c.id === entry);
-                                        if (classItem) {
-                                          classType = classTypes.find(ct => ct.id === classItem.classTypeId);
-                                        }
-                                      }
-                                      if (!classType) {
-                                        // Legacy support: try course type names or badgeLabels
-                                        classType = classTypes.find(ct => ct.badgeLabel === entry || ct.name === entry);
-                                      }
-                                      
-                                      // Only add if we haven't seen this classType.id before
-                                      if (classType && !seenClassTypeIds.has(classType.id)) {
-                                        seenClassTypeIds.add(classType.id);
-                                        const badgeColor = (classType.badgeColor || 'outline') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
-                                        const displayName = classType.badgeLabel || entry;
-                                        uniqueBadges.push({ classType, badgeColor, displayName });
-                                      }
-                                    });
-                                    
-                                    return uniqueBadges.map((badge, idx) => (
-                                      <Badge key={idx} variant={badge.badgeColor} className="text-xs">
-                                        {badge.displayName}
-                                      </Badge>
-                                    ));
-                                  })() : (
-                                    <span className="text-sm text-muted-foreground">None</span>
-                                  )}
+                                <div className="flex flex-wrap gap-1">
+                                  {(() => {
+                                    const classStatuses = getClientClassStatuses(
+                                      client.email,
+                                      registrations,
+                                      classes,
+                                      classTypes
+                                    );
+                                    return classStatuses.length > 0 ? (
+                                      classStatuses.map((classStatus) => (
+                                        <ClientClassBadge
+                                          key={classStatus.classTypeId}
+                                          classStatus={classStatus}
+                                        />
+                                      ))
+                                    ) : (
+                                      <span className="text-sm text-muted-foreground">No certifications</span>
+                                    );
+                                  })()}
                                 </div>
                               </TableCell>
                               <TableCell className="py-3">
