@@ -3,7 +3,7 @@ import { pgTable, text, varchar, date, integer, pgEnum, timestamp, boolean, json
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const classTypeEnum = pgEnum("class_type", ["BLS", "Heartsaver", "ACLS", "BLS/AED"]);
+export const classTypeEnum = pgEnum("class_type", ["BLS", "Heartsaver"]);
 
 // Dynamic class types table for flexible type management
 export const classTypes = pgTable("class_types", {
@@ -11,8 +11,6 @@ export const classTypes = pgTable("class_types", {
   name: text("name").notNull().unique(), // e.g., "BLS", "Heartsaver", "First Aid"
   displayName: text("display_name").notNull(), // e.g., "Basic Life Support", "Heartsaver CPR/AED"
   description: text("description"), // Optional detailed description
-  badgeLabel: text("badge_label").notNull(), // Custom badge text, e.g., "BLS", "CPR", "ACLS"
-  badgeColor: text("badge_color").notNull().default("default").$type<'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline'>(), // Badge color with 10 distinct options
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`NOW()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`NOW()`),
@@ -129,15 +127,10 @@ export const upsertUserSchema = createInsertSchema(users).pick({
   role: true,
 });
 
-// Badge color enum for validation - 10 distinct colors
-const badgeColorEnum = z.enum(['default', 'secondary', 'destructive', 'success', 'warning', 'info', 'purple', 'pink', 'teal', 'outline']);
-
 export const insertClassTypeSchema = createInsertSchema(classTypes).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-}).extend({
-  badgeColor: badgeColorEnum,
 });
 
 export const insertClassSchema = createInsertSchema(classes).omit({

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,7 +20,6 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -218,7 +217,6 @@ function AdminDashboardContent() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const clientsPerPage = 10;
-  const clientSectionRef = useRef<HTMLDivElement>(null);
   
   // Class state
   const [classSearchTerm, setClassSearchTerm] = useState('');
@@ -458,17 +456,9 @@ function AdminDashboardContent() {
       return await apiRequest('PUT', `/api/clients/${id}`, data);
     },
     onSuccess: () => {
-      // Invalidate clients cache to force fresh data fetch
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
-      
-      // Small delay to ensure cache invalidation completes before closing dialog
-      setTimeout(() => {
-        // Clear form state completely
-        editClientForm.reset();
-        setIsEditDialogOpen(false);
-        setSelectedClient(null);
-      }, 100);
-      
+      setIsEditDialogOpen(false);
+      setSelectedClient(null);
       toast({ title: "Success", description: "Client updated successfully" });
     },
     onError: (error) => {
@@ -789,9 +779,7 @@ function AdminDashboardContent() {
       name: '',
       displayName: '',
       description: '',
-      isActive: true,
-      badgeLabel: '',
-      badgeColor: 'default'
+      isActive: true
     }
   });
 
@@ -825,94 +813,6 @@ function AdminDashboardContent() {
     }
   };
 
-  // Utility to compute per-class certification statuses for each client
-  type ClassStatus = {
-    classTypeId: string;
-    classType: ClassType;
-    status: 'valid' | 'renewal-due' | 'expired';
-    lastCompletionDate: string;
-    expirationDate: string;
-    daysUntilExpiration: number;
-  };
-
-  const getClientClassStatuses = (
-    clientEmail: string,
-    registrations: Registration[],
-    classes: Class[],
-    classTypes: ClassType[],
-    validityMonths: number = 24,
-    renewalWindowDays: number = 60
-  ): ClassStatus[] => {
-    const today = new Date();
-    today.setHours(12, 0, 0, 0); // Normalize to noon to avoid time-of-day issues
-    
-    // Find all confirmed registrations for this client
-    const clientRegistrations = registrations.filter(
-      reg => reg.email === clientEmail && reg.status === 'confirmed'
-    );
-
-    // Group by classTypeId and find most recent COMPLETED class per class type
-    const classCompletions = new Map<string, { date: string; classId: string }>();
-    
-    clientRegistrations.forEach(registration => {
-      const classItem = classes.find(c => c.id === registration.classId);
-      if (!classItem || !classItem.classTypeId) return;
-      
-      // Only count classes that have already occurred (completion date)
-      const classDate = parseDateLocal(classItem.date);
-      if (classDate > today) return; // Skip future classes
-      
-      const existing = classCompletions.get(classItem.classTypeId);
-      
-      if (!existing || classDate > parseDateLocal(existing.date)) {
-        classCompletions.set(classItem.classTypeId, {
-          date: classItem.date, // Use class date, not registration date
-          classId: classItem.id
-        });
-      }
-    });
-
-    // Calculate status for each completed class type
-    const statuses: ClassStatus[] = [];
-
-    classCompletions.forEach((completion, classTypeId) => {
-      const classType = classTypes.find(ct => ct.id === classTypeId);
-      if (!classType) return;
-
-      const completionDate = parseDateLocal(completion.date);
-      const expirationDate = new Date(completionDate);
-      expirationDate.setMonth(expirationDate.getMonth() + validityMonths);
-      expirationDate.setHours(12, 0, 0, 0); // Normalize to noon
-      
-      const renewalDate = new Date(expirationDate);
-      renewalDate.setDate(renewalDate.getDate() - renewalWindowDays);
-      renewalDate.setHours(12, 0, 0, 0); // Normalize to noon
-
-      const timeDiff = expirationDate.getTime() - today.getTime();
-      const daysUntilExpiration = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-      let status: 'valid' | 'renewal-due' | 'expired';
-      if (today >= expirationDate) {
-        status = 'expired';
-      } else if (today >= renewalDate) {
-        status = 'renewal-due';
-      } else {
-        status = 'valid';
-      }
-
-      statuses.push({
-        classTypeId,
-        classType,
-        status,
-        lastCompletionDate: completion.date,
-        expirationDate: expirationDate.toLocaleDateString('en-CA'), // Returns YYYY-MM-DD format
-        daysUntilExpiration
-      });
-    });
-
-    return statuses.sort((a, b) => a.classType.displayName.localeCompare(b.classType.displayName));
-  };
-
   const filteredClients = clients.filter(client => {
     // Text search filter
     const matchesSearch = 
@@ -921,31 +821,18 @@ function AdminDashboardContent() {
       `${client.firstName} ${client.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Get per-class statuses for this client for accurate filtering
-    const clientClassStatuses = getClientClassStatuses(
-      client.email,
-      registrations,
-      classes,
-      classTypes
-    );
-
-    // Certification status filter - use per-class statuses for accurate filtering
-    const overallStatus = calculateOverallClientStatus(clientClassStatuses);
+    // Certification status filter
     const matchesCertificationStatus = 
       clientFilters.certificationStatus === 'all' ||
-      overallStatus === clientFilters.certificationStatus;
-    
-    // Extract class type names for filtering
-    const completedClassTypes = clientClassStatuses.map(cs => cs.classType.name.toLowerCase());
-    const hasBLS = completedClassTypes.some(type => type.includes('bls'));
-    const hasHeartSaver = completedClassTypes.some(type => type.includes('heartsaver'));
-    
+      client.certificationStatus === clientFilters.certificationStatus;
+
+    // Course type filter
     const matchesCourseType = 
       clientFilters.courseType === 'all' ||
-      (clientFilters.courseType === 'bls' && hasBLS) ||
-      (clientFilters.courseType === 'heartsaver' && hasHeartSaver) ||
-      (clientFilters.courseType === 'both' && hasBLS && hasHeartSaver) ||
-      (clientFilters.courseType === 'none' && clientClassStatuses.length === 0);
+      (clientFilters.courseType === 'bls' && client.completedCourses.includes('BLS')) ||
+      (clientFilters.courseType === 'heartsaver' && client.completedCourses.includes('Heartsaver')) ||
+      (clientFilters.courseType === 'both' && client.completedCourses.includes('BLS') && client.completedCourses.includes('Heartsaver')) ||
+      (clientFilters.courseType === 'none' && client.completedCourses.length === 0);
 
     // Registration date range filter
     const matchesRegistrationDate = getDateRangeFilter(
@@ -972,35 +859,6 @@ function AdminDashboardContent() {
   const resetPagination = () => {
     setCurrentPage(1);
   };
-
-  // Scroll to client section top
-  const scrollToClientTop = () => {
-    clientSectionRef.current?.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'start' 
-    });
-  };
-
-  // Handle pagination with scroll to top
-  const handlePreviousPage = () => {
-    setCurrentPage(prev => {
-      const newPage = Math.max(1, prev - 1);
-      if (newPage !== prev) {
-        setTimeout(() => scrollToClientTop(), 50); // Small delay to ensure state update
-      }
-      return newPage;
-    });
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => {
-      const newPage = Math.min(totalPages, prev + 1);
-      if (newPage !== prev) {
-        setTimeout(() => scrollToClientTop(), 50); // Small delay to ensure state update
-      }
-      return newPage;
-    });
-  };
   
   const filteredClasses = classes.filter(classItem =>
     classItem.title.toLowerCase().includes(classSearchTerm.toLowerCase()) ||
@@ -1008,27 +866,6 @@ function AdminDashboardContent() {
   );
 
   const registrations = registrationsData?.registrations || [];
-  
-  // Helper function to parse date strings as local dates (avoid timezone issues)
-  const parseDateLocal = (dateStr: string): Date => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day, 12, 0, 0); // Noon local time to avoid DST edge cases
-  };
-
-
-
-  // Calculate overall client status from individual class statuses (for legacy filters)
-  const calculateOverallClientStatus = (classStatuses: ClassStatus[]): 'active' | 'update' | 'expired' => {
-    if (classStatuses.length === 0) return 'expired';
-    
-    const hasExpired = classStatuses.some(cs => cs.status === 'expired');
-    const hasRenewalDue = classStatuses.some(cs => cs.status === 'renewal-due');
-    
-    if (hasExpired) return 'expired';
-    if (hasRenewalDue) return 'update';
-    return 'active';
-  };
-
   const filteredRegistrations = registrations.filter(registration =>
     registration.firstName.toLowerCase().includes(registrationSearchTerm.toLowerCase()) ||
     registration.lastName.toLowerCase().includes(registrationSearchTerm.toLowerCase()) ||
@@ -1047,162 +884,12 @@ function AdminDashboardContent() {
     (classType.description && classType.description.toLowerCase().includes(classTypeSearchTerm.toLowerCase()))
   );
 
-  // Normalize completed courses to only use classType.id values (same logic as badge display)
-  const normalizeCompletedCourses = (completedCourses: string[]) => {
-    const seenClassTypeIds = new Set<string>();
-    const normalizedCourses: string[] = [];
-    
-    completedCourses.forEach((entry) => {
-      // Try to find the classType for this entry using the same logic as badge display
-      let classType = classTypes.find(ct => ct.id === entry); // Try classType.id first (preferred)
-      if (!classType) {
-        // Legacy support: try class.id -> classType.id
-        const classItem = classes.find(c => c.id === entry);
-        if (classItem) {
-          classType = classTypes.find(ct => ct.id === classItem.classTypeId);
-        }
-      }
-      if (!classType) {
-        // Legacy support: try course type names or badgeLabels
-        classType = classTypes.find(ct => ct.badgeLabel === entry || ct.name === entry);
-      }
-      
-      // Only add if we found a valid classType and haven't seen it before
-      if (classType && !seenClassTypeIds.has(classType.id)) {
-        seenClassTypeIds.add(classType.id);
-        normalizedCourses.push(classType.id);
-      }
-    });
-    
-    return normalizedCourses;
-  };
-
-  // ClientClassBadge component with split-color rendering
-  const ClientClassBadge = ({ classStatus }: { classStatus: ClassStatus }) => {
-    const { classType, status, lastCompletionDate, expirationDate, daysUntilExpiration } = classStatus;
-    
-    // Ensure badgeColor is a valid variant
-    const validVariants = ['default', 'secondary', 'destructive', 'success', 'warning', 'info', 'purple', 'pink', 'teal', 'outline'] as const;
-    const badgeVariant = validVariants.includes(classType.badgeColor as any) 
-      ? classType.badgeColor as typeof validVariants[number]
-      : 'default';
-
-    // Create tooltip text
-    const formatDate = (dateStr: string) => {
-      return new Date(dateStr).toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
-      });
-    };
-
-    let tooltipText = '';
-    let statusText = '';
-    let ariaSuffix = '';
-    
-    if (status === 'valid') {
-      statusText = classType.badgeLabel;
-      tooltipText = `${classType.displayName}\nCompleted: ${formatDate(lastCompletionDate)}\nExpires: ${formatDate(expirationDate)}\n${daysUntilExpiration} days remaining`;
-      ariaSuffix = `valid until ${formatDate(expirationDate)}`;
-    } else if (status === 'renewal-due') {
-      statusText = `${classType.badgeLabel} • Renew by ${formatDate(expirationDate)}`;
-      tooltipText = `${classType.displayName}\nCompleted: ${formatDate(lastCompletionDate)}\nRenewal due: ${formatDate(expirationDate)}\n${daysUntilExpiration} days to renew`;
-      ariaSuffix = `renewal due in ${daysUntilExpiration} days`;
-    } else {
-      const expiredDays = Math.abs(daysUntilExpiration);
-      statusText = `${classType.badgeLabel} • Expired ${formatDate(expirationDate)}`;
-      tooltipText = `${classType.displayName}\nCompleted: ${formatDate(lastCompletionDate)}\nExpired: ${formatDate(expirationDate)}\nExpired ${expiredDays} days ago`;
-      ariaSuffix = `expired ${expiredDays} days ago`;
-    }
-
-    // For valid status, use solid color
-    if (status === 'valid') {
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Badge 
-              variant={badgeVariant}
-              className="text-xs whitespace-nowrap"
-              data-testid={`badge-class-${classType.id}`}
-              aria-label={`${classType.displayName} certification ${ariaSuffix}`}
-            >
-              {statusText}
-            </Badge>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="whitespace-pre-line text-sm">
-              {tooltipText}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      );
-    }
-
-    // For renewal-due and expired, use split-color gradient
-    const statusColor = status === 'renewal-due' ? 'warning' : 'destructive';
-    const statusBgColor = status === 'renewal-due' 
-      ? 'hsl(var(--warning))' 
-      : 'hsl(var(--destructive))';
-    
-    // Get the main color for the class type
-    const getClassColor = (variant: string) => {
-      switch (variant) {
-        case 'success': return 'hsl(var(--success))';
-        case 'warning': return 'hsl(var(--warning))';
-        case 'destructive': return 'hsl(var(--destructive))';
-        case 'info': return 'hsl(var(--info))';
-        case 'purple': return 'hsl(var(--purple))';
-        case 'pink': return 'hsl(var(--pink))';
-        case 'teal': return 'hsl(var(--teal))';
-        case 'secondary': return 'hsl(var(--secondary))';
-        case 'outline': return 'transparent';
-        default: return 'hsl(var(--primary))';
-      }
-    };
-
-    const classBgColor = getClassColor(badgeVariant);
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className="inline-flex items-center rounded-md text-xs font-medium ring-1 ring-inset px-2.5 py-0.5 whitespace-nowrap cursor-default"
-            style={{
-              background: `linear-gradient(to right, ${classBgColor} 50%, ${statusBgColor} 50%)`,
-              color: 'hsl(var(--primary-foreground))',
-              borderColor: 'hsl(var(--border))'
-            }}
-            data-testid={`badge-class-${classType.id}`}
-            aria-label={`${classType.displayName} certification ${ariaSuffix}`}
-          >
-            {statusText}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <div className="whitespace-pre-line text-sm">
-            {tooltipText}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    );
-  };
-
   // Client handlers
   const handleEdit = (client: Client) => {
     // Always find the latest client data from the current clients list
     // to ensure we have the most up-to-date information
     const latestClient = clients.find(c => c.id === client.id) || client;
     setSelectedClient(latestClient);
-    
-    // Force a complete form reset to clear any stale state
-    editClientForm.reset();
-    
-    // Only normalize if we have the required data loaded, otherwise use raw data
-    const completedCoursesData = (classTypes.length > 0 && classes.length > 0) 
-      ? normalizeCompletedCourses(latestClient.completedCourses || [])
-      : latestClient.completedCourses || [];
-    
-    // Then set the fresh data
     editClientForm.reset({
       firstName: latestClient.firstName,
       lastName: latestClient.lastName,
@@ -1210,7 +897,7 @@ function AdminDashboardContent() {
       phone: latestClient.phone || '',
       registrationDate: latestClient.registrationDate,
       lastCourseDate: latestClient.lastCourseDate || '',
-      completedCourses: completedCoursesData
+      completedCourses: latestClient.completedCourses
     });
     setIsEditDialogOpen(true);
   };
@@ -1329,9 +1016,7 @@ function AdminDashboardContent() {
       name: classType.name,
       displayName: classType.displayName,
       description: classType.description || '',
-      isActive: classType.isActive,
-      badgeLabel: classType.badgeLabel,
-      badgeColor: classType.badgeColor
+      isActive: classType.isActive
     });
     setIsEditClassTypeDialogOpen(true);
   };
@@ -1447,22 +1132,7 @@ function AdminDashboardContent() {
     availableSpots: classes.reduce((sum, classItem) => sum + classItem.available, 0),
     totalRegistrations: registrations.length,
     pendingRegistrations: registrations.filter(r => r.status === 'pending').length,
-    monthlyRevenue: (() => {
-      const currentDate = new Date();
-      const currentMonth = currentDate.getMonth();
-      const currentYear = currentDate.getFullYear();
-      
-      return registrations
-        .filter(r => {
-          // Only include confirmed registrations
-          if (r.status !== 'confirmed') return false;
-          
-          // Only include registrations from current month/year
-          const regDate = new Date(r.registrationDate);
-          return regDate.getMonth() === currentMonth && regDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, r) => sum + (r.amountPaid || 0), 0) / 100; // Convert cents to dollars
-    })()
+    monthlyRevenue: 2450 // TODO: Calculate from actual data
   };
 
   // Toggle collapsible sections
@@ -1898,7 +1568,7 @@ function AdminDashboardContent() {
 
         {/* Client Management */}
         <Collapsible open={openSection === 'clients'} onOpenChange={() => toggleSection('clients')}>
-          <Card ref={clientSectionRef}>
+          <Card>
             <CollapsibleTrigger className="w-full">
               <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors" data-testid="section-header-clients">
                 <div className="flex items-center justify-between">
@@ -2011,27 +1681,24 @@ function AdminDashboardContent() {
                                 <p className="text-sm text-muted-foreground">{client.phone}</p>
                               )}
                             </div>
-                            <div className="flex flex-wrap gap-1">
-                              {(() => {
-                                const classStatuses = getClientClassStatuses(
-                                  client.email,
-                                  registrations,
-                                  classes,
-                                  classTypes
-                                );
-                                return classStatuses.length > 0 ? (
-                                  classStatuses.map((classStatus) => (
-                                    <ClientClassBadge
-                                      key={classStatus.classTypeId}
-                                      classStatus={classStatus}
-                                    />
-                                  ))
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">No certifications</span>
-                                );
-                              })()}
-                            </div>
+                            <Badge variant={
+                              client.certificationStatus === 'active' ? 'success' : 
+                              client.certificationStatus === 'update' ? 'warning' : 
+                              'destructive'
+                            }>
+                              {client.certificationStatus}
+                            </Badge>
                           </div>
+                          
+                          {client.completedCourses.length > 0 && (
+                            <div className="flex gap-1 flex-wrap">
+                              {client.completedCourses.map((course, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {course}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                           
                           <div className="flex justify-between items-center pt-2 border-t">
                             <div className="text-xs text-muted-foreground">
@@ -2071,7 +1738,8 @@ function AdminDashboardContent() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-1/4">Client</TableHead>
-                          <TableHead className="w-2/5">Certifications</TableHead>
+                          <TableHead className="w-1/6">Status</TableHead>
+                          <TableHead className="w-1/4">Courses</TableHead>
                           <TableHead className="w-1/6">Last Course</TableHead>
                           <TableHead className="w-1/6">Actions</TableHead>
                         </TableRow>
@@ -2079,13 +1747,13 @@ function AdminDashboardContent() {
                       <TableBody>
                         {clientsLoading ? (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                               Loading clients...
                             </TableCell>
                           </TableRow>
                         ) : paginatedClients.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                               {filteredClients.length === 0 ? 'No clients found' : 'No clients on this page'}
                             </TableCell>
                           </TableRow>
@@ -2102,25 +1770,23 @@ function AdminDashboardContent() {
                                 </div>
                               </TableCell>
                               <TableCell className="py-3">
-                                <div className="flex flex-wrap gap-1">
-                                  {(() => {
-                                    const classStatuses = getClientClassStatuses(
-                                      client.email,
-                                      registrations,
-                                      classes,
-                                      classTypes
-                                    );
-                                    return classStatuses.length > 0 ? (
-                                      classStatuses.map((classStatus) => (
-                                        <ClientClassBadge
-                                          key={classStatus.classTypeId}
-                                          classStatus={classStatus}
-                                        />
-                                      ))
-                                    ) : (
-                                      <span className="text-sm text-muted-foreground">No certifications</span>
-                                    );
-                                  })()}
+                                <Badge variant={
+                                  client.certificationStatus === 'active' ? 'success' : 
+                                  client.certificationStatus === 'update' ? 'warning' : 
+                                  'destructive'
+                                }>
+                                  {client.certificationStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <div className="flex gap-1 flex-wrap">
+                                  {client.completedCourses.length > 0 ? client.completedCourses.map((course, idx) => (
+                                    <Badge key={idx} variant="outline" className="text-xs">
+                                      {course}
+                                    </Badge>
+                                  )) : (
+                                    <span className="text-sm text-muted-foreground">None</span>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell className="py-3">
@@ -2168,7 +1834,7 @@ function AdminDashboardContent() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={handlePreviousPage}
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                         disabled={currentPage === 1}
                         data-testid="button-previous-page"
                       >
@@ -2178,7 +1844,7 @@ function AdminDashboardContent() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleNextPage}
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                         disabled={currentPage === totalPages}
                         data-testid="button-next-page"
                       >
@@ -2274,16 +1940,9 @@ function AdminDashboardContent() {
                         <TableRow key={classItem.id} data-testid={`row-class-${classItem.id}`}>
                           <TableCell className="font-medium">{classItem.title}</TableCell>
                           <TableCell>
-                            {(() => {
-                              const classType = classTypes.find(ct => ct.id === classItem.classTypeId);
-                              const badgeColor = (classType?.badgeColor || 'default') as 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' | 'purple' | 'pink' | 'teal' | 'outline';
-                              const badgeLabel = classType?.badgeLabel || classItem.type;
-                              return (
-                                <Badge variant={badgeColor}>
-                                  {badgeLabel}
-                                </Badge>
-                              );
-                            })()}
+                            <Badge variant={classItem.type === 'BLS' ? 'default' : 'secondary'}>
+                              {classItem.type}
+                            </Badge>
                           </TableCell>
                           <TableCell>{classItem.date}</TableCell>
                           <TableCell>{classItem.time}</TableCell>
@@ -3247,7 +2906,7 @@ function AdminDashboardContent() {
 
         {/* Edit Client Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Edit Client</DialogTitle>
               <DialogDescription>
@@ -3351,40 +3010,45 @@ function AdminDashboardContent() {
                     name="completedCourses"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Completed Course Types</FormLabel>
+                        <FormLabel>Completed Courses</FormLabel>
                         <FormDescription>
-                          Select all course types this client has completed (from registrations or manual assignment)
+                          Select all courses this client has completed
                         </FormDescription>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
-                          {classTypes.map((classType) => (
-                            <div key={classType.id} className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                id={`edit-course-type-${classType.id}`}
-                                checked={field.value?.includes(classType.id) || false}
-                                onChange={(e) => {
-                                  const current = field.value || [];
-                                  const classTypeId = classType.id;
-                                  if (e.target.checked) {
-                                    // Only add if not already present
-                                    if (!current.includes(classTypeId)) {
-                                      field.onChange([...current, classTypeId]);
-                                    }
-                                  } else {
-                                    // Remove the course type
-                                    field.onChange(current.filter(c => c !== classTypeId));
-                                  }
-                                }}
-                                data-testid={`checkbox-edit-course-type-${classType.id}`}
-                              />
-                              <Label htmlFor={`edit-course-type-${classType.id}`} className="text-sm leading-tight flex items-center gap-2">
-                                <Badge variant={classType.badgeColor as any} className="text-xs">
-                                  {classType.badgeLabel}
-                                </Badge>
-                                <span>{classType.description}</span>
-                              </Label>
-                            </div>
-                          ))}
+                        <div className="flex gap-4">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="course-bls"
+                              checked={field.value?.includes('BLS') || false}
+                              onChange={(e) => {
+                                const current = field.value || [];
+                                if (e.target.checked) {
+                                  field.onChange([...current.filter(c => c !== 'BLS'), 'BLS']);
+                                } else {
+                                  field.onChange(current.filter(c => c !== 'BLS'));
+                                }
+                              }}
+                              data-testid="checkbox-course-bls"
+                            />
+                            <Label htmlFor="course-bls">BLS Provider</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="course-heartsaver"
+                              checked={field.value?.includes('Heartsaver') || false}
+                              onChange={(e) => {
+                                const current = field.value || [];
+                                if (e.target.checked) {
+                                  field.onChange([...current.filter(c => c !== 'Heartsaver'), 'Heartsaver']);
+                                } else {
+                                  field.onChange(current.filter(c => c !== 'Heartsaver'));
+                                }
+                              }}
+                              data-testid="checkbox-course-heartsaver"
+                            />
+                            <Label htmlFor="course-heartsaver">Heartsaver CPR</Label>
+                          </div>
                         </div>
                         <FormMessage />
                       </FormItem>
@@ -3443,10 +3107,41 @@ function AdminDashboardContent() {
                 
                 <FormField
                   control={addClassForm.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-add-type">
+                            <SelectValue placeholder="Select class type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {classTypesLoading ? (
+                            <SelectItem value="" disabled>Loading class types...</SelectItem>
+                          ) : classTypes.filter(ct => ct.isActive).length > 0 ? (
+                            classTypes.filter(ct => ct.isActive).map((classType) => (
+                              <SelectItem key={classType.id} value={classType.name}>
+                                {classType.displayName}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>No active class types available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={addClassForm.control}
                   name="classTypeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Class Type</FormLabel>
+                      <FormLabel>Class Type (Advanced)</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
                         <FormControl>
                           <SelectTrigger data-testid="select-add-classtype">
@@ -3646,10 +3341,41 @@ function AdminDashboardContent() {
                   
                   <FormField
                     control={editClassForm.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-edit-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {classTypesLoading ? (
+                              <SelectItem value="" disabled>Loading class types...</SelectItem>
+                            ) : classTypes.filter(ct => ct.isActive).length > 0 ? (
+                              classTypes.filter(ct => ct.isActive).map((classType) => (
+                                <SelectItem key={classType.id} value={classType.name}>
+                                  {classType.displayName}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="" disabled>No active class types available</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editClassForm.control}
                     name="classTypeId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Class Type</FormLabel>
+                        <FormLabel>Class Type (Advanced)</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger data-testid="select-edit-classtype">
@@ -4172,40 +3898,45 @@ function AdminDashboardContent() {
                   name="completedCourses"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Completed Course Types</FormLabel>
+                      <FormLabel>Completed Courses</FormLabel>
                       <FormDescription>
-                        Select all course types this client has completed
+                        Select all courses this client has completed
                       </FormDescription>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
-                        {classTypes.map((classType) => (
-                          <div key={classType.id} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id={`add-course-type-${classType.id}`}
-                              checked={field.value?.includes(classType.id) || false}
-                              onChange={(e) => {
-                                const current = field.value || [];
-                                const classTypeId = classType.id;
-                                if (e.target.checked) {
-                                  // Only add if not already present
-                                  if (!current.includes(classTypeId)) {
-                                    field.onChange([...current, classTypeId]);
-                                  }
-                                } else {
-                                  // Remove the course type
-                                  field.onChange(current.filter(c => c !== classTypeId));
-                                }
-                              }}
-                              data-testid={`checkbox-add-course-type-${classType.id}`}
-                            />
-                            <Label htmlFor={`add-course-type-${classType.id}`} className="text-sm leading-tight flex items-center gap-2">
-                              <Badge variant={classType.badgeColor as any} className="text-xs">
-                                {classType.badgeLabel}
-                              </Badge>
-                              <span>{classType.description}</span>
-                            </Label>
-                          </div>
-                        ))}
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="add-course-bls"
+                            checked={field.value?.includes('BLS') || false}
+                            onChange={(e) => {
+                              const current = field.value || [];
+                              if (e.target.checked) {
+                                field.onChange([...current.filter(c => c !== 'BLS'), 'BLS']);
+                              } else {
+                                field.onChange(current.filter(c => c !== 'BLS'));
+                              }
+                            }}
+                            data-testid="checkbox-add-course-bls"
+                          />
+                          <Label htmlFor="add-course-bls">BLS Provider</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="add-course-heartsaver"
+                            checked={field.value?.includes('Heartsaver') || false}
+                            onChange={(e) => {
+                              const current = field.value || [];
+                              if (e.target.checked) {
+                                field.onChange([...current.filter(c => c !== 'Heartsaver'), 'Heartsaver']);
+                              } else {
+                                field.onChange(current.filter(c => c !== 'Heartsaver'));
+                              }
+                            }}
+                            data-testid="checkbox-add-course-heartsaver"
+                          />
+                          <Label htmlFor="add-course-heartsaver">Heartsaver CPR</Label>
+                        </div>
                       </div>
                       <FormMessage />
                     </FormItem>
@@ -4237,7 +3968,7 @@ function AdminDashboardContent() {
 
         {/* Add Class Type Dialog */}
         <Dialog open={isAddClassTypeDialogOpen} onOpenChange={setIsAddClassTypeDialogOpen}>
-          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Add New Class Type</DialogTitle>
               <DialogDescription>
@@ -4323,60 +4054,6 @@ function AdminDashboardContent() {
                   )}
                 />
                 
-                <FormField
-                  control={addClassTypeForm.control}
-                  name="badgeLabel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Badge Label</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g. BLS, CPR, ACLS"
-                          {...field} 
-                          data-testid="input-badge-label"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Short text displayed on the badge (e.g., "BLS", "CPR")
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={addClassTypeForm.control}
-                  name="badgeColor"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Badge Color</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-badge-color">
-                            <SelectValue placeholder="Select badge color" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="default">Red (Default)</SelectItem>
-                          <SelectItem value="secondary">Gray (Secondary)</SelectItem>
-                          <SelectItem value="destructive">Red (Destructive)</SelectItem>
-                          <SelectItem value="success">Green (Success)</SelectItem>
-                          <SelectItem value="warning">Yellow (Warning)</SelectItem>
-                          <SelectItem value="info">Blue (Info)</SelectItem>
-                          <SelectItem value="purple">Purple</SelectItem>
-                          <SelectItem value="pink">Pink</SelectItem>
-                          <SelectItem value="teal">Teal</SelectItem>
-                          <SelectItem value="outline">Outlined</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Color theme for the badge display
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
                 <DialogFooter>
                   <Button 
                     type="button"
@@ -4401,7 +4078,7 @@ function AdminDashboardContent() {
 
         {/* Edit Class Type Dialog */}
         <Dialog open={isEditClassTypeDialogOpen} onOpenChange={setIsEditClassTypeDialogOpen}>
-          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Edit Class Type</DialogTitle>
               <DialogDescription>
@@ -4412,7 +4089,6 @@ function AdminDashboardContent() {
             {selectedClassType && (
               <Form {...editClassTypeForm}>
                 <form onSubmit={editClassTypeForm.handleSubmit(onEditClassTypeSubmit)} className="space-y-4">
-                  <div className="space-y-4">
                   <FormField
                     control={editClassTypeForm.control}
                     name="name"
@@ -4458,8 +4134,7 @@ function AdminDashboardContent() {
                             {...field}
                             value={field.value || ''} 
                             placeholder="Describe this class type and its purpose..." 
-                            className="resize-none min-h-[80px] max-h-32"
-                            rows={3}
+                            className="min-h-[80px]"
                             data-testid="textarea-edit-classtype-description"
                           />
                         </FormControl>
@@ -4489,61 +4164,6 @@ function AdminDashboardContent() {
                       </FormItem>
                     )}
                   />
-                  
-                  <FormField
-                    control={editClassTypeForm.control}
-                    name="badgeLabel"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Badge Label</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="e.g. BLS, CPR, ACLS"
-                            {...field} 
-                            data-testid="input-edit-badge-label"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Short text displayed on the badge (e.g., "BLS", "CPR")
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={editClassTypeForm.control}
-                    name="badgeColor"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Badge Color</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-edit-badge-color">
-                              <SelectValue placeholder="Select badge color" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="default">Red (Default)</SelectItem>
-                            <SelectItem value="secondary">Gray (Secondary)</SelectItem>
-                            <SelectItem value="destructive">Red (Destructive)</SelectItem>
-                            <SelectItem value="success">Green (Success)</SelectItem>
-                            <SelectItem value="warning">Yellow (Warning)</SelectItem>
-                            <SelectItem value="info">Blue (Info)</SelectItem>
-                            <SelectItem value="purple">Purple</SelectItem>
-                            <SelectItem value="pink">Pink</SelectItem>
-                            <SelectItem value="teal">Teal</SelectItem>
-                            <SelectItem value="outline">Outlined</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          Color theme for the badge display
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  </div>
                   
                   <DialogFooter>
                     <Button 

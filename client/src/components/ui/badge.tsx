@@ -19,14 +19,6 @@ const badgeVariants = cva(
           "border-transparent bg-success text-success-foreground shadow-xs",
         warning:
           "border-transparent bg-warning text-warning-foreground shadow-xs",
-        info:
-          "border-transparent bg-blue-500 text-white shadow-xs",
-        purple:
-          "border-transparent bg-purple-500 text-white shadow-xs",
-        pink:
-          "border-transparent bg-pink-500 text-white shadow-xs",
-        teal:
-          "border-transparent bg-teal-500 text-white shadow-xs",
 
         outline: " border [border-color:var(--badge-outline)] shadow-xs",
       },
